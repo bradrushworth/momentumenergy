@@ -124,11 +124,11 @@ class BarChartState extends State<BarChartWidget1> {
                             title: _title,
                             legends: _prices
                                 ? [
+                                    Legend(title: 'Supply', color: colors[0]),
                                     Legend(title: 'Off Peak', color: colors[2]),
                                     Legend(title: 'Shoulder', color: colors[3]),
                                     Legend(title: 'Peak', color: colors[4]),
                                     Legend(title: 'Control', color: colors[1]),
-                                    Legend(title: 'Supply', color: colors[0]),
                                   ]
                                 : [
                                     Legend(title: 'Off Peak', color: colors[2]),
@@ -147,9 +147,9 @@ class BarChartState extends State<BarChartWidget1> {
                                   //[BarChartGroupData(x: 0, barRods: [makeRodData(80)]),],
                                   titlesData: FlTitlesData(
                                     rightTitles:
-                                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                        const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                                     topTitles:
-                                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                        const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                                     bottomTitles: AxisTitles(
                                         sideTitles: SideTitles(
                                       reservedSize: 30,
@@ -189,7 +189,7 @@ class BarChartState extends State<BarChartWidget1> {
                                             })),
                                   ),
                                   //maxY: 10.0,
-                                  gridData: FlGridData(show: false),
+                                  gridData: const FlGridData(show: false),
                                   borderData: FlBorderData(show: false),
                                 ),
                                 swapAnimationDuration:
