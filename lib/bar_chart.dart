@@ -159,7 +159,7 @@ class BarChartState extends State<BarChartWidget1> {
                                         return SideTitleWidget(
                                           axisSide: AxisSide.bottom,
                                           angle: math.radians(-90),
-                                          space: 11,
+                                          space: 9,
                                           child: Text(
                                             xValue.toInt() % 2 == 0
                                                 ? _barChartTitles[xValue.toInt()]!
@@ -174,16 +174,20 @@ class BarChartState extends State<BarChartWidget1> {
                                         sideTitles: SideTitles(
                                             showTitles: true,
                                             //interval: 1,
-                                            reservedSize: 25,
+                                            reservedSize: 40,
                                             getTitlesWidget: (xValue, titleMeta) {
-                                              String formattedNumber =
-                                                  xValue.toStringAsPrecision(1);
+                                              String formattedNumber;
+                                              if (xValue < 1) {
+                                                formattedNumber = xValue.toStringAsFixed(2);
+                                              } else {
+                                                formattedNumber = xValue.toStringAsFixed(0);
+                                              }
                                               return SideTitleWidget(
                                                 axisSide: AxisSide.left,
                                                 //child: Text(xValue == xValue.roundToDouble() ? "$xValue" : ''),
                                                 child: Text(
-                                                  formattedNumber,
-                                                  style: const TextStyle(fontSize: 8),
+                                                  (_prices ? '\$' : '') + formattedNumber,
+                                                  style: const TextStyle(fontSize: 9),
                                                 ),
                                               );
                                             })),
@@ -393,7 +397,7 @@ class DataAggregator {
     }
   }
 
-  double roundDouble(double value, int places) {
+  static double roundDouble(double value, int places) {
     num mod = pow(10.0, places);
     return ((value * mod).ceilToDouble() / mod);
   }
@@ -404,10 +408,7 @@ class DataAggregator {
     //print("meterNum=$meterNum");
     return BarChartRodData(
       toY: roundDouble(value, _prices ? 2 : 3),
-      // colors: [
-      //   const Color(0xFFFFAB5E),
-      //   const Color(0xFFFFD336),
-      // ],
+      color: Colors.white70,
       width: 6, // / _duration.inDays,
       //borderRadius: BorderRadius.circular(2),
       rodStackItems: stackedValues
