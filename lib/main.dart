@@ -302,7 +302,7 @@ class HomePageState extends State<HomePage> {
                                             ending: const Duration(days: 3), prices: true)),
                                     MyCard(
                                         child: BarChartWidget1(
-                                            rawData, '4 Before - Use', const Duration(days: 1),
+                                            rawData, '4 Before Use', const Duration(days: 1),
                                             ending: const Duration(days: 4), prices: false)),
                                     MyCard(
                                         child: BarChartWidget1(
