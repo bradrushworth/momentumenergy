@@ -1,11 +1,3 @@
-buildscript {
-
-    dependencies {
-//        classpath "com.android.tools.build:gradle:${ext.agpVersion}"
-//        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${ext.kotlin_version}"
-    }
-}
-
 allprojects {
     ext {
         kotlin_version = "2.2.20"

@@ -1,5 +1,4 @@
 plugins {
-//    id 'org.jetbrains.kotlin.jvm' version '1.9.22'
     id "com.android.application"
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
@@ -56,16 +55,6 @@ android {
         main.kotlin.srcDirs += 'src/main/kotlin'
     }
 
-    kotlin {
-        jvmToolchain(21)
-    }
-
-    java {
-        toolchain {
-            languageVersion.set(JavaLanguageVersion.of(21))
-        }
-    }
-
     defaultConfig {
         applicationId "au.com.bitbot.momentumenergy"
         minSdkVersion flutter.minSdkVersion
@@ -95,9 +84,3 @@ android {
 flutter {
     source '../..'
 }
-
-dependencies {
-    //implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
-}
-
-tasks.register("prepareKotlinBuildScriptModel") {}
