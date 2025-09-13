@@ -1,3 +1,10 @@
+plugins {
+//    id 'org.jetbrains.kotlin.jvm' version '1.9.22'
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file('local.properties')
 if (localPropertiesFile.exists()) {
@@ -21,9 +28,9 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
+//apply plugin: 'com.android.application'
+//apply plugin: 'kotlin-android'
+//apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
@@ -34,27 +41,37 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    compileSdkVersion 36
+    namespace 'au.com.bitbot.momentumenergy'
+
+    compileSdkVersion rootProject.ext.compileSdkVersion
+    ndkVersion flutter.ndkVersion
+
+    compileOptions {
+        // Flag to enable support for the new language APIs
+        coreLibraryDesugaringEnabled false
+    }
 
     sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
+        main.java.srcDirs += 'src/main/java'
+        main.kotlin.srcDirs += 'src/main/kotlin'
+    }
+
+    kotlin {
+        jvmToolchain(21)
+    }
+
+    java {
+        toolchain {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        }
     }
 
     defaultConfig {
         applicationId "au.com.bitbot.momentumenergy"
         minSdkVersion flutter.minSdkVersion
-        targetSdkVersion 36
+        targetSdkVersion rootProject.ext.compileSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8 // Or your desired Java version
-        targetCompatibility = JavaVersion.VERSION_1_8 // Or your desired Java version
-    }
-
-    kotlinOptions {
-        jvmTarget = "1.8" // Or your desired Java version, matching compileOptions
     }
 
     signingConfigs {
@@ -73,7 +90,6 @@ android {
             signingConfig signingConfigs.release
         }
     }
-    namespace 'au.com.bitbot.momentumenergy'
 }
 
 flutter {
@@ -81,5 +97,7 @@ flutter {
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+    //implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
 }
+
+tasks.register("prepareKotlinBuildScriptModel") {}
