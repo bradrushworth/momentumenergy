@@ -34,7 +34,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    compileSdkVersion 33
+    compileSdkVersion 36
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
@@ -42,10 +42,19 @@ android {
 
     defaultConfig {
         applicationId "au.com.bitbot.momentumenergy"
-        minSdkVersion 16
-        targetSdkVersion 33
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8 // Or your desired Java version
+        targetCompatibility = JavaVersion.VERSION_1_8 // Or your desired Java version
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8" // Or your desired Java version, matching compileOptions
     }
 
     signingConfigs {

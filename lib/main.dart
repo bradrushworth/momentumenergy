@@ -57,12 +57,12 @@ class MyAppState extends State<MyApp> {
 
           theme: ThemeData.light().copyWith(
             textTheme: const TextTheme(
-              bodyText2: TextStyle(color: Color(0xFFA7A7A7), fontSize: 13),
+              bodyMedium: TextStyle(color: Color(0xFFA7A7A7), fontSize: 13),
             ),
           ),
           darkTheme: ThemeData.dark().copyWith(
             textTheme: const TextTheme(
-              bodyText2: TextStyle(color: Color(0xFFA7A7A7), fontSize: 13),
+              bodyMedium: TextStyle(color: Color(0xFFA7A7A7), fontSize: 13),
             ),
           ),
           themeMode: themeModel.currentTheme(),
@@ -200,7 +200,7 @@ class HomePageState extends State<HomePage> {
                                         ? '\'Export table\''
                                         : '\'Export table\' from MyAccount',
                                     style: TextStyle(
-                                        color: Theme.of(context).textTheme.button?.color ??
+                                        color: Theme.of(context).textTheme.labelSmall?.color ??
                                             Colors.blueAccent,
                                         height: 1.5),
                                     recognizer: TapGestureRecognizer()
@@ -219,7 +219,7 @@ class HomePageState extends State<HomePage> {
                                   TextSpan(
                                     text: 'Select File',
                                     style: TextStyle(
-                                        color: Theme.of(context).textTheme.button?.color ??
+                                        color: Theme.of(context).textTheme.labelSmall?.color ??
                                             Colors.blueAccent),
                                     recognizer: TapGestureRecognizer()
                                       ..onTap = () {
