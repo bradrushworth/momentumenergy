@@ -45,7 +45,7 @@ Momentum Energy (Australia) electricity usage from a downloaded CSV export.
   in half-hour units (e.g. `graphPos < 7 * 2` = before 07:00).
 
 ## Versioning
-- `pubspec.yaml`: `version: x.y.z+build` (e.g. `1.3.1+18`).
+- `pubspec.yaml`: `version: x.y.z+build` (e.g. `1.3.2+19`).
 
 ## Deployment
 - No local deploy script. CI is Codemagic. **Push to `origin/master`** to
@@ -63,3 +63,14 @@ Momentum Energy (Australia) electricity usage from a downloaded CSV export.
   to force a real push, then confirm with `git log origin/master`.
 - `lib/utils.dart` `darken`/`lighten` may still use the deprecated
   `Color.red/green/blue/alpha` getters (SDK deprecation, not a logic bug).
+- **iOS / CocoaPods:** `ios/Podfile.lock` is NOT committed (only the lock in
+  `pubspec.lock` is), so after any dependency bump that shifts the native pod
+  graph, the Codemagic macOS agent's cached `Pods/` can fall out of sync with
+  the freshly generated `Podfile.lock` and the build fails with "The sandbox is
+  not in sync with the Podfile.lock. Run 'pod install'...". This is a CI cache
+  issue, NOT an app-code bug. Fix by re-running the build (fresh worker) or
+  clearing the pod cache first (`rm -rf ios/Podfile.lock ios/Pods && cd ios &&
+  pod install`). Do NOT try to "remove CocoaPods" to speed up the build - this
+  app uses native iOS plugins (`url_launcher`, `file_picker`,
+  `device_preview_plus`) that Flutter wires in via CocoaPods; removing it would
+  break the iOS build. CI is dashboard-configured (no `codemagic.yaml`).
