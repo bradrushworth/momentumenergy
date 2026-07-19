@@ -1,0 +1,65 @@
+﻿# Cline Rules - Momentum Energy Dashboard
+
+Project: Momentum Energy Dashboard, a Flutter app that visualises a customer''s
+Momentum Energy (Australia) electricity usage from a downloaded CSV export.
+
+## Commands
+- `flutter pub get` - install/refresh dependencies.
+- `flutter test` - run the test suite (aggregation logic + widget test).
+- `flutter analyze` - static analysis. Pre-existing SDK deprecation/info
+  warnings are expected; treat any NEW error as a regression.
+
+## Data source
+- Unlike the Amber app, this one does NOT call an API. The user downloads a
+  usage CSV from the Momentum Energy MyAccount Portal and uploads it in the
+  app. The CSV is parsed and aggregated LOCALLY (in-browser / on-device); the
+  file is never uploaded.
+- Parsing uses the `csv` package (`CsvToListConverter`). The test fixture is
+  `assets/Your_Usage_List_Sample.csv`.
+- Source rows are 5-minute intervals (`METER_INTERVAL = 5`).
+
+## Tests
+- `test/bar_chart_test.dart` - `DataAggregator` aggregation tests. The ''1 Day''
+  test asserts 48 half-hour bars and that each bar sums 6 x 5-minute values
+  (e.g. 0.018 + 0.015 + ... + 0.019).
+- `test/widget_test.dart` - basic widget smoke test.
+
+## Chart aggregation model (IMPORTANT)
+- Graph bars are FIXED **half-hour buckets**: 2 bars/hour = 48 bars/day. This
+  is intentional and must NOT be changed to one-bar-per-interval.
+- 5-minute data: **6 five-minute intervals are summed into each half-hour
+  bar** (value = sum of 6 x 5-min kWh or cost).
+- In `lib/bar_chart.dart`, `graphPos` uses
+  `date.hour * 2 + date.minute ~/ 30` (half-hour width). This is correct; do
+  NOT "fix" it to a per-interval formula (that would create 288 bars and
+  produce wrong time ranges and values).
+- The daily supply charge is split per interval
+  (`DAILY / 24 / (60 / METER_INTERVAL)`) and summed back to a half-hour amount
+  across the 6 intervals in a bar.
+
+## Key constants (lib/bar_chart.dart)
+- `METER_INTERVAL` = 5 (the 5-minute source interval).
+- `DAILY` = daily supply charge; `CONTROLLED`, `OFFPEAK`, `SHOULDER`, `PEAK` =
+  tiered rates used by `_getCost`; `colors` = bar segment colours.
+- Tariff/time-of-use bands in `_getCost`/`_getCostColor` are keyed on `graphPos`
+  in half-hour units (e.g. `graphPos < 7 * 2` = before 07:00).
+
+## Versioning
+- `pubspec.yaml`: `version: x.y.z+build` (e.g. `1.3.1+18`).
+
+## Deployment
+- No local deploy script. CI is Codemagic. **Push to `origin/master`** to
+  trigger the build/deploy (web, Android, iOS). Configured via the Codemagic
+  dashboard (no `codemagic.yaml` in the repo).
+
+## Gotchas
+- Test runs can fail with a locked build dir (`build\unit_test_assets`). Fix
+  by deleting the build folder (`Remove-Item -Recurse -Force build`) and
+  re-running `flutter test`.
+- Repo files are **CRLF**. Multi-line edits via the editor tool using `\n`
+  fail to match; prefer single-line edits or include `\r\n`.
+- A plain `git push origin master` can falsely print "Everything up-to-date"
+  even when the commit is still local. Use `git push origin master --verbose`
+  to force a real push, then confirm with `git log origin/master`.
+- `lib/utils.dart` `darken`/`lighten` may still use the deprecated
+  `Color.red/green/blue/alpha` getters (SDK deprecation, not a logic bug).
