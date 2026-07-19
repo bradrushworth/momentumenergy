@@ -43,6 +43,10 @@
 	<false/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Need to download your energy CSV file.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app uses the system file picker so you can upload your Momentum Energy usage CSV. The camera is only used if you choose to take a photo.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app does not use your location. This permission may be requested by a system component but is not required to view your energy usage.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<string>NO</string>
 	<key>LSApplicationQueriesSchemes</key>
