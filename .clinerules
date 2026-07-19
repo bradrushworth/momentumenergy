@@ -74,3 +74,7 @@ Momentum Energy (Australia) electricity usage from a downloaded CSV export.
   app uses native iOS plugins (`url_launcher`, `file_picker`,
   `device_preview_plus`) that Flutter wires in via CocoaPods; removing it would
   break the iOS build. CI is dashboard-configured (no `codemagic.yaml`).
+- The Codemagic **Post-clone script** that clears and regenerates the Pods
+  sandbox lives at `scripts/codemagic_post_clone.sh`. Paste its contents into
+  the Codemagic dashboard "Post-clone script" field (it runs `flutter pub get`
+  then `rm -rf ios/Pods ios/Podfile.lock && cd ios && pod install`).
