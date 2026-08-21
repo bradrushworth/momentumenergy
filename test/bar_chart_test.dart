@@ -81,11 +81,11 @@ void main() {
 
       expect(
           dataAggregator.newData[0]!.barRods.first.rodStackItems.first.fromY, closeTo(0.0, 0.01));
-      expect(dataAggregator.newData[0]!.barRods.first.rodStackItems.first.toY, closeTo(0.05, 0.01));
+      expect(dataAggregator.newData[0]!.barRods.first.rodStackItems.first.toY, closeTo(0.04, 0.01));
       expect(dataAggregator.newData[0]!.barRods.first.rodStackItems.last.fromY,
-          closeTo(0.05 + dailySupplyChargePer30mins, 0.01));
+          closeTo(0.04 + 0.03, 0.01));
       expect(dataAggregator.newData[0]!.barRods.first.rodStackItems.last.toY,
-          closeTo(0.05 + dailySupplyChargePer30mins, 0.01));
+          closeTo(0.04 + 0.03, 0.01));
     });
 
     test('2 Days', () async {
@@ -131,11 +131,11 @@ void main() {
       expect(
           dataAggregator.newData[0]!.barRods.first.rodStackItems.first.fromY, closeTo(0.0, 0.001));
       expect(
-          dataAggregator.newData[0]!.barRods.first.rodStackItems.first.toY, closeTo(0.224, 0.001));
+          dataAggregator.newData[0]!.barRods.first.rodStackItems.first.toY, closeTo(0.223, 0.001));
       expect(
-          dataAggregator.newData[0]!.barRods.first.rodStackItems.last.fromY, closeTo(0.224, 0.001));
+          dataAggregator.newData[0]!.barRods.first.rodStackItems.last.fromY, closeTo(0.223, 0.001));
       expect(
-          dataAggregator.newData[0]!.barRods.first.rodStackItems.last.toY, closeTo(0.9535, 0.001));
+          dataAggregator.newData[0]!.barRods.first.rodStackItems.last.toY, closeTo(0.953, 0.001));
     });
 
     test('1 Day Costs 1 Day Prior', () async {
@@ -183,11 +183,70 @@ void main() {
 
       expect(
           dataAggregator.newData[0]!.barRods.first.rodStackItems.first.fromY, closeTo(0.00, 0.01));
-      expect(dataAggregator.newData[0]!.barRods.first.rodStackItems.first.toY, closeTo(0.05, 0.01));
+      expect(dataAggregator.newData[0]!.barRods.first.rodStackItems.first.toY, closeTo(0.04, 0.01));
       expect(
           dataAggregator.newData[0]!.barRods.first.rodStackItems.last.fromY, closeTo(0.08, 0.01));
       expect(
-          dataAggregator.newData[0]!.barRods.first.rodStackItems.last.toY, closeTo(0.2299, 0.01));
+          dataAggregator.newData[0]!.barRods.first.rodStackItems.last.toY, closeTo(0.21, 0.01));
+    });
+
+    // Current Momentum exports contain a single meter (one row per timestamp).
+    // The old meter detection scanned for the first repeated timestamp and
+    // never found one, so every chart threw NotEnoughDataException.
+    List<List<dynamic>> buildSingleMeter({int days = 2, int startDay = 6}) {
+      // 06/07/25 was a Sunday; 07/07/25 a Monday (matches the real export era).
+      final data = <List<dynamic>>[];
+      for (int d = 0; d < days; d++) {
+        for (int i = 0; i < 288; i++) {
+          final h = (i * 5) ~/ 60, m = (i * 5) % 60;
+          final dd = (startDay + d).toString().padLeft(2, '0');
+          data.add([
+            '$dd/07/25 ${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}',
+            0.1,
+            'Actual'
+          ]);
+        }
+      }
+      return data;
+    }
+
+    test('Single-meter export aggregates (regression)', () {
+      final dataAggregator =
+          DataAggregator(const Duration(days: 1), const Duration(days: 0), false);
+      dataAggregator.aggregateData(buildSingleMeter());
+
+      expect(dataAggregator.newData.length, 48);
+      // 6 five-minute reads of 0.1 kWh per half-hour bar.
+      expect(dataAggregator.newData[0]!.barRods.first.toY, closeTo(0.6, 0.001));
+      expect(dataAggregator.newData[47]!.barRods.first.toY, closeTo(0.6, 0.001));
+    });
+
+    test('Single-meter export bills at time-of-use, not controlled load', () {
+      // Last day of the fixture is Monday 07/07/25 (a weekday): peak window
+      // bars must use PEAK, and never the controlled-load rate.
+      final dataAggregator =
+          DataAggregator(const Duration(days: 1), const Duration(days: 0), true);
+      dataAggregator.aggregateData(buildSingleMeter());
+
+      final supplyPer30mins = DAILY / 24 / 2;
+      // 18:00 sits in the 17:00-20:00 peak window (graphPos 36).
+      expect(dataAggregator.newData[36]!.barRods.first.toY,
+          closeTo(PEAK * 0.6 + supplyPer30mins, 0.01));
+      // 03:00 is off peak (graphPos 6).
+      expect(dataAggregator.newData[6]!.barRods.first.toY,
+          closeTo(OFFPEAK * 0.6 + supplyPer30mins, 0.01));
+    });
+
+    test('Weekend day bills off-peak all day (single meter)', () {
+      // One-day chart ending one day back lands on Sunday 06/07/25.
+      final dataAggregator =
+          DataAggregator(const Duration(days: 1), const Duration(days: 1), true);
+      dataAggregator.aggregateData(buildSingleMeter());
+
+      final supplyPer30mins = DAILY / 24 / 2;
+      // Peak-window slot still billed off peak on a weekend.
+      expect(dataAggregator.newData[36]!.barRods.first.toY,
+          closeTo(OFFPEAK * 0.6 + supplyPer30mins, 0.01));
     });
   });
 }

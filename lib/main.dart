@@ -1,3 +1,5 @@
+import 'dart:convert' show utf8;
+
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:device_preview_plus/device_preview_plus.dart';
 import 'package:file_picker/file_picker.dart';
@@ -10,6 +12,7 @@ import 'package:momentum_energy/my_theme_model.dart';
 import 'package:momentum_energy/screenshots_mobile.dart'
     if (dart.library.io) 'package:momentum_energy/screenshots_mobile.dart'
     if (dart.library.js) 'package:momentum_energy/screenshots_other.dart';
+import 'package:momentum_energy/tariffs.dart';
 import 'package:momentum_energy/utils.dart';
 import 'package:provider/provider.dart';
 
@@ -90,13 +93,24 @@ class HomePageState extends State<HomePage> {
   ];
   late List<DropdownMenuItem<ListItem>> _dropdownMenuItems;
   late ListItem _dropdownItemSelected;
+  // Bumped when tariffs change so the chart grid re-parses with new rates.
+  int _tariffsRevision = 0;
 
   @override
   initState() {
     super.initState();
     _dropdownMenuItems = buildDropDownMenuItems(_dropdownItems);
     _dropdownItemSelected = _dropdownMenuItems[0].value!;
+    _loadTariffs();
     _loadDefaultFile();
+  }
+
+  void _loadTariffs() async {
+    await tariffs.load();
+    if (!mounted) return;
+    setState(() {
+      _tariffsRevision++;
+    });
   }
 
   void _loadDefaultFile() async {
@@ -117,7 +131,8 @@ class HomePageState extends State<HomePage> {
       allowCompression: false,
     );
     if (result != null && result.files.first.bytes != null) {
-      String data = String.fromCharCodes(result.files.first.bytes!);
+      // Momentum exports are UTF-8; fromCharCodes treated the bytes as UTF-16.
+      String data = utf8.decode(result.files.first.bytes!, allowMalformed: true);
       //print('_pickFile');
       //print('data=$data');
       setState(() {
@@ -134,6 +149,66 @@ class HomePageState extends State<HomePage> {
         _loadDefaultFile();
       });
     }
+  }
+
+  Future<void> _showTariffDialog(BuildContext context) async {
+    final controllers = {
+      'Daily supply (\$/day)': TextEditingController(text: tariffs.daily.toStringAsFixed(4)),
+      'Controlled load (\$/kWh)':
+          TextEditingController(text: tariffs.controlled.toStringAsFixed(4)),
+      'Off peak (\$/kWh)': TextEditingController(text: tariffs.offPeak.toStringAsFixed(4)),
+      'Shoulder (\$/kWh)': TextEditingController(text: tariffs.shoulder.toStringAsFixed(4)),
+      'Peak (\$/kWh)': TextEditingController(text: tariffs.peak.toStringAsFixed(4)),
+    };
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Tariff rates'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: controllers.entries
+                  .map((e) => TextField(
+                        controller: e.value,
+                        decoration: InputDecoration(labelText: e.key),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      ))
+                  .toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final values = controllers.values
+                    .map((c) => double.tryParse(c.text.trim()))
+                    .toList();
+                if (values.any((v) => v == null || v < 0)) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Rates must be non-negative numbers, e.g. 0.2992')));
+                  return;
+                }
+                tariffs.daily = values[0]!;
+                tariffs.controlled = values[1]!;
+                tariffs.offPeak = values[2]!;
+                tariffs.shoulder = values[3]!;
+                tariffs.peak = values[4]!;
+                tariffs.save();
+                Navigator.pop(context);
+                setState(() {
+                  _tariffsRevision++;
+                });
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   List<DropdownMenuItem<ListItem>> buildDropDownMenuItems(List listItems) {
@@ -238,6 +313,12 @@ class HomePageState extends State<HomePage> {
                             //         .switchTheme();
                             //   },
                             // ),
+                            IconButton(
+                              icon: const Icon(Icons.settings, size: 18),
+                              tooltip: 'Tariff rates',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => _showTariffDialog(context),
+                            ),
                             DropdownButtonHideUnderline(
                               child: DropdownButton(
                                   dropdownColor: const Color(0xFF20202A),
@@ -254,8 +335,9 @@ class HomePageState extends State<HomePage> {
                         ),
                         Expanded(
                           child: GridView.count(
-                            // Ensure that widget state changes with dropdown changes
-                            key: Key(_dropdownItemSelected.name),
+                            // Ensure that widget state changes with dropdown or
+                            // tariff changes (charts cache their parsed data)
+                            key: Key('${_dropdownItemSelected.name}-$_tariffsRevision'),
                             crossAxisCount: constraints.maxWidth < 710 ? 1 : 2,
                             semanticChildCount: 2,
                             childAspectRatio: 2.34,
@@ -416,7 +498,12 @@ class HomePageState extends State<HomePage> {
                                       ],
                           ),
                         ),
-                        Container(
+                        SafeArea(
+                          top: false,
+                          bottom: true,
+                          left: false,
+                          right: false,
+                          child: Container(
                           color: themeModel.isDark() ? const Color(0xFF20202A) : Colors.white,
                           width: double.infinity,
                           height: 30,
@@ -504,6 +591,7 @@ class HomePageState extends State<HomePage> {
                               ),
                             ],
                           ),
+                        ),
                         ),
                       ],
                     ),

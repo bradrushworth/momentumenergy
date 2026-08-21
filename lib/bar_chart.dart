@@ -6,6 +6,7 @@ import 'package:csv/csv_settings_autodetection.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:momentum_energy/my_theme_model.dart';
+import 'package:momentum_energy/tariffs.dart';
 import 'package:provider/provider.dart';
 import 'package:vector_math/vector_math.dart' as math;
 
@@ -15,6 +16,9 @@ const String cancelled = 'Cancelled';
 const String loading = 'Loading';
 
 const int METER_INTERVAL = 5; // minutes
+
+// Default rates, kept for tests/backwards-compatibility; the live values are
+// user-adjustable via Settings and read from `tariffs` (see tariffs.dart).
 const double DAILY = 2.1109; // Daily charge
 const double CONTROLLED = 0.1771; // Controlled
 const double OFFPEAK = 0.2992; // Off peak
@@ -56,6 +60,7 @@ class BarChartState extends State<BarChartWidget1> {
   bool _loading = true;
   bool _cancelled = false;
   bool _notEnoughData = false;
+  bool _hasControlled = false;
 
   @override
   initState() {
@@ -122,20 +127,14 @@ class BarChartState extends State<BarChartWidget1> {
                       : [
                           TopSectionWidget(
                             title: _title,
-                            legends: _prices
-                                ? [
-                                    Legend(title: 'Supply', color: colors[0]),
-                                    Legend(title: 'Off Peak', color: colors[2]),
-                                    Legend(title: 'Shoulder', color: colors[3]),
-                                    Legend(title: 'Peak', color: colors[4]),
-                                    Legend(title: 'Control', color: colors[1]),
-                                  ]
-                                : [
-                                    Legend(title: 'Off Peak', color: colors[2]),
-                                    Legend(title: 'Shoulder', color: colors[3]),
-                                    Legend(title: 'Peak', color: colors[4]),
-                                    Legend(title: 'Control', color: colors[1]),
-                                  ],
+                            legends: [
+                              if (_prices) Legend(title: 'Supply', color: colors[0]),
+                              Legend(title: 'Off Peak', color: colors[2]),
+                              Legend(title: 'Shoulder', color: colors[3]),
+                              Legend(title: 'Peak', color: colors[4]),
+                              // Only multi-meter exports have a controlled load
+                              if (_hasControlled) Legend(title: 'Control', color: colors[1]),
+                            ],
                             padding: const EdgeInsets.only(left: 3, right: 3, top: 3, bottom: 3),
                           ),
                           Expanded(
@@ -274,6 +273,7 @@ class BarChartState extends State<BarChartWidget1> {
       setState(() {
         _barChartData = dataAggregator.newData.values.toList();
         _barChartTitles = dataAggregator.newTitles;
+        _hasControlled = dataAggregator._numMeters > 1;
         _loading = false;
         _cancelled = false;
         _notEnoughData = false;
@@ -300,6 +300,10 @@ class DataAggregator {
 
   late final Duration _duration, _ending;
   late final bool _prices;
+  int _numMeters = 1;
+  // True when every in-range record fell on a weekend; single-day weekend
+  // charts then colour their bars off-peak to match how they are billed.
+  bool _allWeekend = false;
 
   DataAggregator(this._duration, this._ending, this._prices);
 
@@ -317,19 +321,17 @@ class DataAggregator {
   }
 
   aggregateData(List<List<dynamic>> data) {
-    int numMeters = 0;
-    {
-      String date, previousDate = '';
-      for (List record in data) {
-        date = record[0];
-        numMeters++;
-        if (date == previousDate) {
-          break;
-        }
-        previousDate = date;
-      }
-      //print('numMeters=$numMeters');
+    // Meters show up as consecutive rows sharing one timestamp. Current
+    // single-meter exports have unique timestamps, so the count naturally
+    // stops at 1 (the old first-repeat scan ran to data.length there and
+    // rendered nothing).
+    int numMeters = 1;
+    final String firstDate = data.first[0];
+    while (numMeters < data.length && data[numMeters][0] == firstDate) {
+      numMeters++;
     }
+    _numMeters = numMeters;
+    //print('numMeters=$numMeters');
 
     DateTime latest = DateTime.parse(dateParse(data.last[0]).substring(0, 8))
         .subtract(_ending)
@@ -342,6 +344,8 @@ class DataAggregator {
 
     bool beforeRange = false;
     bool afterRange = false;
+    bool sawWeekday = false;
+    bool sawWeekend = false;
 
     for (int n = 0; n < data.length; n += numMeters) {
       List<dynamic> record = data[n];
@@ -364,6 +368,12 @@ class DataAggregator {
       int graphPos = date.hour * 2 + date.minute ~/ 30;
       newTitles[graphPos] = newTitles[graphPos] ?? date.toString().substring(11, 16);
 
+      if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
+        sawWeekend = true;
+      } else {
+        sawWeekday = true;
+      }
+
       for (int meterNum = 0; meterNum < numMeters; meterNum++) {
         record = data[n + meterNum];
         //print("adding date=$date record[1]=${record[1]}");
@@ -376,12 +386,14 @@ class DataAggregator {
       }
 
       if (_prices) {
-        double dailySupplyChargePerInterval = DAILY / 24 / (60 / METER_INTERVAL);
-        double dailySupplyChargePer30Mins = DAILY / 24 / 2;
+        double dailySupplyChargePerInterval = tariffs.daily / 24 / (60 / METER_INTERVAL);
+        double dailySupplyChargePer30Mins = tariffs.daily / 24 / 2;
         stackedValue[graphPos] = stackedValue[graphPos]! + dailySupplyChargePerInterval;
         stackedValues[graphPos]![numMeters] = dailySupplyChargePer30Mins * _duration.inDays;
       }
     }
+
+    _allWeekend = sawWeekend && !sawWeekday;
 
     //print('beforeRange=$beforeRange afterRange=$afterRange');
     if (!beforeRange || !afterRange) {
@@ -399,7 +411,8 @@ class DataAggregator {
 
   static double roundDouble(double value, int places) {
     num mod = pow(10.0, places);
-    return ((value * mod).ceilToDouble() / mod);
+    // round, not ceil: ceiling every stack segment biased totals upward.
+    return ((value * mod).roundToDouble() / mod);
   }
 
   BarChartRodData makeRodData(int graphPos, double value, List<double> stackedValues) {
@@ -429,10 +442,16 @@ class DataAggregator {
 
   Color _getCostColor(int meterNum, int graphPos) {
     //print("meterNum=$meterNum graphPos=$graphPos");
-    if (!_prices && meterNum == 1 || _prices && meterNum == 2) {
+    // meterNum indexes the REVERSED stack list. The controlled-load meter
+    // (source meter 0) only exists on multi-meter exports and sits at the end
+    // of the reversed list; on cost charts the supply segment is prepended.
+    if (_numMeters > 1 &&
+        (!_prices && meterNum == _numMeters - 1 || _prices && meterNum == _numMeters)) {
       return colors[1]; // Controlled
     } else if (_prices && meterNum == 0) {
       return colors[0]; // Supply
+    } else if (_allWeekend) {
+      return colors[2]; // Off peak (weekends are billed off-peak all day)
     } else if (graphPos < 7 * 2) {
       return colors[2]; // Off peak
     } else if (graphPos < 17 * 2) {
@@ -447,20 +466,22 @@ class DataAggregator {
   }
 
   double _getCost(int meterNum, int weekday, int graphPos, double value) {
-    if (meterNum == 0) {
-      return value * CONTROLLED; // Controlled
+    if (_numMeters > 1 && meterNum == 0) {
+      // Meter 0 is the controlled load only when the export has a second
+      // meter; a single-meter export is all general usage.
+      return value * tariffs.controlled; // Controlled
     } else if (weekday == DateTime.saturday || weekday == DateTime.sunday) {
-      return value * OFFPEAK; // Off peak
+      return value * tariffs.offPeak; // Off peak
     } else if (graphPos < 7 * 2) {
-      return value * OFFPEAK; // Off peak
+      return value * tariffs.offPeak; // Off peak
     } else if (graphPos < 17 * 2) {
-      return value * SHOULDER; // Shoulder
+      return value * tariffs.shoulder; // Shoulder
     } else if (graphPos < 20 * 2) {
-      return value * PEAK; // Peak
+      return value * tariffs.peak; // Peak
     } else if (graphPos < 22 * 2) {
-      return value * SHOULDER; // Shoulder
+      return value * tariffs.shoulder; // Shoulder
     } else {
-      return value * OFFPEAK; // Off peak
+      return value * tariffs.offPeak; // Off peak
     }
   }
 }
