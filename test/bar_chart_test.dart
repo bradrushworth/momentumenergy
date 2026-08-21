@@ -4,6 +4,7 @@ import 'package:csv/csv.dart';
 import 'package:csv/csv_settings_autodetection.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:momentum_energy/bar_chart.dart';
+import 'package:momentum_energy/tariffs.dart';
 
 void main() {
   group('Bar Chart', () {
@@ -247,6 +248,40 @@ void main() {
       // Peak-window slot still billed off peak on a weekend.
       expect(dataAggregator.newData[36]!.barRods.first.toY,
           closeTo(OFFPEAK * 0.6 + supplyPer30mins, 0.01));
+    });
+
+    test('Changed tariff rates flow through to aggregated values', () {
+      // The aggregator must read the mutable `tariffs` singleton, not the
+      // compile-time default constants. `tariffs` is process-global state, so
+      // restore the defaults afterwards or the change leaks into other tests.
+      tariffs.daily = 4.8;
+      tariffs.offPeak = 0.10;
+      tariffs.peak = 1.00;
+      try {
+        final dataAggregator =
+            DataAggregator(const Duration(days: 1), const Duration(days: 0), true);
+        dataAggregator.aggregateData(buildSingleMeter());
+
+        final supplyPer30mins = 4.8 / 24 / 2;
+        // Weekday peak slot (18:00) uses the new peak rate...
+        expect(dataAggregator.newData[36]!.barRods.first.toY,
+            closeTo(1.00 * 0.6 + supplyPer30mins, 0.01));
+        // ...and the off-peak slot (03:00) the new off-peak rate. Both must
+        // differ from what the default constants would have produced.
+        expect(dataAggregator.newData[6]!.barRods.first.toY,
+            closeTo(0.10 * 0.6 + supplyPer30mins, 0.01));
+        expect((dataAggregator.newData[6]!.barRods.first.toY -
+                    (OFFPEAK * 0.6 + DAILY / 24 / 2))
+                .abs(),
+            greaterThan(0.05));
+      } finally {
+        final defaults = Tariffs();
+        tariffs.daily = defaults.daily;
+        tariffs.controlled = defaults.controlled;
+        tariffs.offPeak = defaults.offPeak;
+        tariffs.shoulder = defaults.shoulder;
+        tariffs.peak = defaults.peak;
+      }
     });
   });
 }
