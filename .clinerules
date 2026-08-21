@@ -1,4 +1,8 @@
-﻿# Cline Rules - Momentum Energy Dashboard
+# Cline Rules - Momentum Energy Dashboard
+
+> NOTE: `AGENTS.md` is the canonical agent guide for this repo and is
+> kept up to date; this file is retained for Cline compatibility. When the
+> two disagree, `AGENTS.md` wins.
 
 Project: Momentum Energy Dashboard, a Flutter app that visualises a customer''s
 Momentum Energy (Australia) electricity usage from a downloaded CSV export.
@@ -56,8 +60,9 @@ Momentum Energy (Australia) electricity usage from a downloaded CSV export.
 - Test runs can fail with a locked build dir (`build\unit_test_assets`). Fix
   by deleting the build folder (`Remove-Item -Recurse -Force build`) and
   re-running `flutter test`.
-- Repo files are **CRLF**. Multi-line edits via the editor tool using `\n`
-  fail to match; prefer single-line edits or include `\r\n`.
+- Line endings are normalized via `.gitattributes` (`* text=auto`) since
+  Aug 2026: the repo stores LF; Windows checkouts are CRLF. No need to
+  hand-craft CRLF sequences in edits any more.
 - A plain `git push origin master` can falsely print "Everything up-to-date"
   even when the commit is still local. Use `git push origin master --verbose`
   to force a real push, then confirm with `git log origin/master`.
