@@ -1,4 +1,4 @@
-name: momentum_energy
+﻿name: momentum_energy
 description: "Momentum Energy Dashboard: View energy usage patterns with Momentum Energy electricity provider in Australia."
 
 # The following line prevents the package from being accidentally published to
@@ -15,7 +15,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-version: 1.4.0+23
+version: 1.4.1+24
 
 environment:
   sdk: '>=3.9.2 <4.0.0'
@@ -39,7 +39,7 @@ dependencies:
   csv: ^6.0.0
   file_picker: ^10.3.3
   shared_preferences: ^2.2.0
-  # auto_size_text dropped with lib/top_section.dart — its last consumer.
+  # auto_size_text dropped with lib/top_section.dart â€” its last consumer.
   #image: ^3.1.0
   #package_info_plus: ^1.0.6
   vector_math: any
