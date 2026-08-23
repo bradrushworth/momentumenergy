@@ -113,7 +113,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Supply'), findsOneWidget);
+      expect(find.text('Supply charge'), findsOneWidget);
     });
 
     testWidgets('does not render Supply label when showSupply is false', (tester) async {
@@ -123,7 +123,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Supply'), findsNothing);
+      expect(find.text('Supply charge'), findsNothing);
     });
   });
 }
