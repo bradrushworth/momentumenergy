@@ -21,8 +21,9 @@ void main() {
       expect(fieldNames[1].trim(), 'Read Value - kWh (kilowatt hours)');
       expect(fieldNames[2].trim(), 'Reading quality');
 
-      DataAggregator dataAggregator =
-          DataAggregator(const Duration(days: 1), const Duration(days: 0), false);
+      DataAggregator dataAggregator = DataAggregator(
+          const Duration(days: 1), const Duration(days: 0), false,
+          numMeters: 2);
       dataAggregator.aggregateData(data);
 
       expect(dataAggregator.newTitles.length, 48);
@@ -63,8 +64,9 @@ void main() {
       expect(fieldNames[1].trim(), 'Read Value - kWh (kilowatt hours)');
       expect(fieldNames[2].trim(), 'Reading quality');
 
-      DataAggregator dataAggregator =
-          DataAggregator(const Duration(days: 1), const Duration(days: 0), true);
+      DataAggregator dataAggregator = DataAggregator(
+          const Duration(days: 1), const Duration(days: 0), true,
+          numMeters: 2);
       dataAggregator.aggregateData(data);
 
       expect(dailySupplyChargePer30mins, closeTo(0.0440, 0.001));
@@ -100,8 +102,9 @@ void main() {
       expect(fieldNames[1].trim(), 'Read Value - kWh (kilowatt hours)');
       expect(fieldNames[2].trim(), 'Reading quality');
 
-      DataAggregator dataAggregator =
-          DataAggregator(const Duration(days: 2), const Duration(days: 0), false);
+      DataAggregator dataAggregator = DataAggregator(
+          const Duration(days: 2), const Duration(days: 0), false,
+          numMeters: 2);
       dataAggregator.aggregateData(data);
 
       expect(dataAggregator.newTitles.length, 48);
@@ -150,8 +153,9 @@ void main() {
       expect(fieldNames[1].trim(), 'Read Value - kWh (kilowatt hours)');
       expect(fieldNames[2].trim(), 'Reading quality');
 
-      DataAggregator dataAggregator =
-          DataAggregator(const Duration(days: 1), const Duration(days: 1), true);
+      DataAggregator dataAggregator = DataAggregator(
+          const Duration(days: 1), const Duration(days: 1), true,
+          numMeters: 2);
       dataAggregator.aggregateData(data);
 
       expect(dataAggregator.newTitles.length, 48);
@@ -212,8 +216,9 @@ void main() {
     }
 
     test('Single-meter export aggregates (regression)', () {
-      final dataAggregator =
-          DataAggregator(const Duration(days: 1), const Duration(days: 0), false);
+      final dataAggregator = DataAggregator(
+          const Duration(days: 1), const Duration(days: 0), false,
+          numMeters: 1);
       dataAggregator.aggregateData(buildSingleMeter());
 
       expect(dataAggregator.newData.length, 48);
@@ -225,8 +230,9 @@ void main() {
     test('Single-meter export bills at time-of-use, not controlled load', () {
       // Last day of the fixture is Monday 07/07/25 (a weekday): peak window
       // bars must use PEAK, and never the controlled-load rate.
-      final dataAggregator =
-          DataAggregator(const Duration(days: 1), const Duration(days: 0), true);
+      final dataAggregator = DataAggregator(
+          const Duration(days: 1), const Duration(days: 0), true,
+          numMeters: 1);
       dataAggregator.aggregateData(buildSingleMeter());
 
       final supplyPer30mins = DAILY / 24 / 2;
@@ -240,8 +246,9 @@ void main() {
 
     test('Weekend day bills off-peak all day (single meter)', () {
       // One-day chart ending one day back lands on Sunday 06/07/25.
-      final dataAggregator =
-          DataAggregator(const Duration(days: 1), const Duration(days: 1), true);
+      final dataAggregator = DataAggregator(
+          const Duration(days: 1), const Duration(days: 1), true,
+          numMeters: 1);
       dataAggregator.aggregateData(buildSingleMeter());
 
       final supplyPer30mins = DAILY / 24 / 2;
@@ -258,8 +265,9 @@ void main() {
       tariffs.offPeak = 0.10;
       tariffs.peak = 1.00;
       try {
-        final dataAggregator =
-            DataAggregator(const Duration(days: 1), const Duration(days: 0), true);
+        final dataAggregator = DataAggregator(
+            const Duration(days: 1), const Duration(days: 0), true,
+            numMeters: 1);
         dataAggregator.aggregateData(buildSingleMeter());
 
         final supplyPer30mins = 4.8 / 24 / 2;
