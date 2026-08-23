@@ -57,6 +57,9 @@ class _HistoryTabState extends State<HistoryTab> {
   /// One entry per day actually present in the file, newest first: e = 0 is
   /// the file's own last date (never `DateTime.now()` — the export is
   /// static, so "today" by the clock may not even be in it), up to 28 days.
+  /// `allowPartial` because a real export cut mid-day leaves a short last
+  /// day; without it the strict range check renders a full-height "Not
+  /// enough data" card instead of the partial day's actual chart.
   List<_Entry> _dayEntries(CsvState state) {
     final lastDate = state.lastDate!;
     final count = state.dayCount < 28 ? state.dayCount : 28;
@@ -66,6 +69,7 @@ class _HistoryTabState extends State<HistoryTab> {
           duration: const Duration(days: 1),
           ending: Duration(days: e),
           title: _dayFormat.format(lastDate.subtract(Duration(days: e))),
+          allowPartial: true,
         ),
     ];
   }

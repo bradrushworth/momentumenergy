@@ -22,6 +22,24 @@ Finder _charts({bool? prices, bool? allowPartial}) => find.byWidgetPredicate((w)
     (prices == null || w.prices == prices) &&
     (allowPartial == null || w.allowPartial == allowPartial));
 
+/// A raw CSV export like [csvFor2Days] (07/07/25 Mon, 08/07/25 Tue, single
+/// meter), except the newest day (08/07/25) only has its first 6 half-hour
+/// rows — mirroring a real Momentum export cut off mid-day.
+String _csvForPartialLastDay() {
+  final buffer = StringBuffer('Date and Time, kWh, Quality\n');
+  for (var i = 0; i < 48; i++) {
+    final h = i ~/ 2;
+    final m = (i % 2) * 30;
+    buffer.writeln('07/07/25 ${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}, 0.5, Actual');
+  }
+  for (var i = 0; i < 6; i++) {
+    final h = i ~/ 2;
+    final m = (i % 2) * 30;
+    buffer.writeln('08/07/25 ${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}, 0.5, Actual');
+  }
+  return buffer.toString();
+}
+
 void main() {
   testWidgets(
       'portrait: two chips render, switching to Usage swaps trailing, titles are data-anchored',
@@ -112,5 +130,32 @@ void main() {
     expect(find.text('Week to Tue 8 Jul'), findsOneWidget);
     expect(find.textContaining('Not enough data'), findsNothing);
     expect(_charts(allowPartial: true), findsWidgets);
+  });
+
+  testWidgets(
+      'portrait: a partial last day still renders its chart (allowPartial), not "Not enough data"',
+      (t) async {
+    final originalSize = t.view.physicalSize;
+    final originalRatio = t.view.devicePixelRatio;
+    t.view.physicalSize = const Size(400, 800);
+    t.view.devicePixelRatio = 1;
+    addTearDown(() {
+      t.view.physicalSize = originalSize;
+      t.view.devicePixelRatio = originalRatio;
+    });
+
+    final state = CsvState()..setCsvForTest('export.csv', _csvForPartialLastDay());
+    await t.pumpWidget(_host(const HistoryTab(weeks: false), state));
+    await t.pump();
+
+    expect(t.takeException(), isNull);
+    // e=0's day card (08/07/25, only 6 of 48 half-hour rows) must render its
+    // actual chart in Cost mode (the default metric) rather than a
+    // full-height "Not enough data" placeholder — without allowPartial the
+    // strict range check rejects a short day as not enough data for the
+    // 1-day window.
+    expect(find.text('Tue 8 Jul'), findsOneWidget);
+    expect(find.textContaining('Not enough data'), findsNothing);
+    expect(_charts(prices: true, allowPartial: true), findsWidgets);
   });
 }
