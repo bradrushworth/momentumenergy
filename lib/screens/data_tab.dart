@@ -7,6 +7,7 @@ import '../state/csv_state.dart';
 import '../state/day_math.dart';
 import '../widgets/chart_card.dart';
 import '../widgets/legend_bar.dart';
+import '../widgets/status_views.dart';
 
 const _kMomentumPink = Color(0xFFFF3E8D);
 const _kHeroBg = Color(0xFF1A1A26);
@@ -40,75 +41,13 @@ class DataTab extends StatelessWidget {
   }
 
   Widget _body(CsvState state) {
-    switch (state.status) {
-      case CsvStatus.loading:
-        return const _StatusPlaceholder(child: CircularProgressIndicator());
-      case CsvStatus.cancelled:
-        return const _CompactMessage('Import cancelled — reloading sample…');
-      case CsvStatus.error:
-        return _ErrorBody(
-          message: state.errorMessage ?? 'Something went wrong.',
-          onImport: state.importFile,
-        );
-      case CsvStatus.ready:
-        // Belt-and-braces: CsvState._parse never leaves `ready` with empty
-        // rows (an empty CSV throws to `error` first), but windowTotals
-        // throws on empty rows, so never call it without this guard.
-        if (state.rows.isEmpty) {
-          return const _StatusPlaceholder(child: CircularProgressIndicator());
-        }
-        return _ReadyBody(state: state);
+    // Belt-and-braces: CsvState._parse never leaves `ready` with empty rows
+    // (an empty CSV throws to `error` first), but windowTotals throws on
+    // empty rows, so never call it without this guard.
+    if (state.status != CsvStatus.ready || state.rows.isEmpty) {
+      return csvStatusView(state);
     }
-  }
-}
-
-class _StatusPlaceholder extends StatelessWidget {
-  final Widget child;
-
-  const _StatusPlaceholder({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(height: 240, child: Center(child: child));
-  }
-}
-
-class _CompactMessage extends StatelessWidget {
-  final String text;
-
-  const _CompactMessage(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(text, style: const TextStyle(color: _kMuted));
-  }
-}
-
-class _ErrorBody extends StatelessWidget {
-  final String message;
-  final VoidCallback onImport;
-
-  const _ErrorBody({required this.message, required this.onImport});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(message, style: const TextStyle(color: Colors.redAccent)),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: onImport,
-            style: FilledButton.styleFrom(backgroundColor: _kMomentumPink),
-            icon: const Icon(Icons.upload_file),
-            label: const Text('Import new export'),
-          ),
-        ),
-      ],
-    );
+    return _ReadyBody(state: state);
   }
 }
 
