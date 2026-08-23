@@ -158,4 +158,28 @@ void main() {
     expect(find.textContaining('Not enough data'), findsNothing);
     expect(_charts(prices: true, allowPartial: true), findsWidgets);
   });
+
+  testWidgets(
+      'portrait: tapping the center of the first ChartCard navigates to its DayDetail',
+      (t) async {
+    final originalSize = t.view.physicalSize;
+    final originalRatio = t.view.devicePixelRatio;
+    t.view.physicalSize = const Size(400, 800);
+    t.view.devicePixelRatio = 1;
+    addTearDown(() {
+      t.view.physicalSize = originalSize;
+      t.view.devicePixelRatio = originalRatio;
+    });
+
+    final state = CsvState()..setCsvForTest('export.csv', csvFor2Days);
+    await t.pumpWidget(_host(const HistoryTab(weeks: false), state));
+    await t.pump();
+
+    // e=0's card is the fixture's own last date (08/07/25, a Tuesday) --
+    // data-derived, never DateTime.now().
+    await t.tap(find.byType(ChartCard).first);
+    await t.pumpAndSettle();
+
+    expect(find.widgetWithText(AppBar, 'Tue 8 Jul'), findsOneWidget);
+  });
 }

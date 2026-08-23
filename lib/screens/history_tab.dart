@@ -8,6 +8,7 @@ import '../state/day_math.dart';
 import '../widgets/chart_card.dart';
 import '../widgets/legend_bar.dart';
 import '../widgets/status_views.dart';
+import 'day_detail.dart';
 
 enum _Metric { cost, usage }
 
@@ -145,10 +146,22 @@ class _HistoryTabState extends State<HistoryTab> {
     }
 
     return InkWell(
-      // Task 7 wires this to push a day-detail screen; the tap target
-      // exists now so the card is InkWell-shaped and its chart stays
-      // IgnorePointer'd (no live tooltip fighting the future tap).
-      onTap: () {},
+      // Pushes the full-screen day detail with this entry's own window (its
+      // duration/ending), not the tapped metric -- DayDetail always shows
+      // the cost chart with live tooltips regardless of which card (Cost or
+      // Usage) was tapped.
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DayDetail(
+            title: entry.title,
+            rows: state.rows,
+            numMeters: state.numMeters,
+            duration: entry.duration,
+            ending: entry.ending,
+          ),
+        ),
+      ),
       child: card,
     );
   }
