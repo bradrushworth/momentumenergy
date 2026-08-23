@@ -37,5 +37,48 @@ void main() {
 
       expect(result.cost, expectedCost);
     });
+
+    group('memoisation', () {
+      setUp(resetWindowTotalsMemo);
+      tearDown(resetWindowTotalsMemo);
+
+      test('the same args are answered from the cache', () {
+        final first = windowTotals(rowsFor2Days, 1, const Duration(days: 1), Duration.zero);
+        expect(windowTotalsComputations, 1);
+
+        final second = windowTotals(rowsFor2Days, 1, const Duration(days: 1), Duration.zero);
+        expect(windowTotalsComputations, 1); // no second aggregation
+        expect(second, first);
+      });
+
+      test('a different revision recomputes', () {
+        windowTotals(rowsFor2Days, 1, const Duration(days: 1), Duration.zero, revision: 0);
+        expect(windowTotalsComputations, 1);
+
+        windowTotals(rowsFor2Days, 1, const Duration(days: 1), Duration.zero, revision: 1);
+        expect(windowTotalsComputations, 2);
+      });
+
+      test('a different window recomputes', () {
+        windowTotals(rowsFor2Days, 1, const Duration(days: 1), Duration.zero);
+        windowTotals(rowsFor2Days, 1, const Duration(days: 1), const Duration(days: 1));
+        expect(windowTotalsComputations, 2);
+      });
+
+      test('a new rows list drops the whole memo', () {
+        windowTotals(rowsFor2Days, 1, const Duration(days: 1), Duration.zero);
+        expect(windowTotalsComputations, 1);
+
+        // A re-import hands over a fresh list with the same content; the memo
+        // is keyed on identity, so nothing carries over.
+        final reimported = rowsFor2Days.toList();
+        windowTotals(reimported, 1, const Duration(days: 1), Duration.zero);
+        expect(windowTotalsComputations, 2);
+
+        // ...and the old list's entries are gone, not merely shadowed.
+        windowTotals(rowsFor2Days, 1, const Duration(days: 1), Duration.zero);
+        expect(windowTotalsComputations, 3);
+      });
+    });
   });
 }

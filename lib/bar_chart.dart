@@ -262,10 +262,12 @@ class DataAggregator {
         ':00';
   }
 
-  /// Meters show up as consecutive rows sharing one timestamp. Kept as a
-  /// static utility (rather than inlined into `aggregateData`) so CsvState
-  /// can detect `numMeters` once at parse time instead of every widget
-  /// self-detecting it on every aggregate.
+  /// Meters show up as consecutive rows sharing one timestamp.
+  ///
+  /// The single implementation of that rule: `CsvState._parse` calls it once
+  /// per file and passes the answer to every `DataAggregator` through
+  /// `numMeters`, so nothing re-detects per aggregate. Returns 1 for an
+  /// empty list.
   static int detectNumMeters(List<List<dynamic>> data) {
     if (data.isEmpty) return 1;
     int numMeters = 1;
@@ -384,7 +386,10 @@ class DataAggregator {
     //print("meterNum=$meterNum");
     return BarChartRodData(
       toY: roundDouble(value, _prices ? 2 : 3),
-      color: Colors.white70,
+      // Transparent, not a colour: the rod is only a backdrop for
+      // `rodStackItems`, which carry every visible segment. A solid rod
+      // showed through above the stack as a grey tip.
+      color: Colors.transparent,
       width: 6, // / _duration.inDays,
       //borderRadius: BorderRadius.circular(2),
       rodStackItems: stackedValues

@@ -33,5 +33,89 @@ void main() {
     s.setCsvForTest('bad.csv', 'Sorry, an error occurred');
     expect(s.status, CsvStatus.error);
     expect(s.errorMessage, isNotNull);
+    // Nothing was ever loaded, so this is the fatal surface, not the banner.
+    expect(s.importError, isNull);
+    expect(s.rows, isEmpty);
+  });
+
+  test('a junk row mid-file is dropped and the rest still parses', () {
+    // Momentum's export occasionally carries a stray error-message line.
+    // Before the shape check it reached DataAggregator.dateParse and blew up
+    // with a RangeError at build time.
+    const withJunk = 'Date and Time, kWh, Quality\n'
+        '07/07/25 00:05, 0.1, Actual\n'
+        'Sorry, an error occurred\n'
+        '07/07/25 00:10, 0.1, Actual\n'
+        '08/07/25 00:05, 0.2, Actual\n';
+
+    final s = CsvState();
+    s.setCsvForTest('export.csv', withJunk);
+
+    expect(s.status, CsvStatus.ready);
+    expect(s.rows.length, 3); // the junk row is gone
+    expect(s.rows.every((r) => r[1] is num), isTrue);
+    expect(s.numMeters, 1);
+    expect(s.dayCount, 2);
+  });
+
+  test('a file whose rows are all junk fails rather than half-parsing', () {
+    final s = CsvState();
+    s.setCsvForTest('bad.csv', 'Date and Time, kWh, Quality\n'
+        'Sorry, an error occurred\nPlease try again later\n');
+    expect(s.status, CsvStatus.error);
+    expect(s.rows, isEmpty);
+  });
+
+  test('a failed import over a good file keeps the file and sets importError', () {
+    final s = CsvState();
+    s.setCsvForTest('good.csv', oneMeter);
+    final goodRows = s.rows;
+
+    s.setCsvForTest('junk.csv', 'Sorry, an error occurred');
+
+    // Everything describing the file on screen is untouched...
+    expect(s.rows, same(goodRows));
+    expect(s.fileName, 'good.csv');
+    expect(s.numMeters, 1);
+    expect(s.dayCount, 2);
+    // ...and the failure is reported on the non-fatal surface only.
+    expect(s.status, CsvStatus.ready);
+    expect(s.errorMessage, isNull);
+    expect(s.importError, isNotNull);
+
+    // A later good import clears it.
+    s.setCsvForTest('good2.csv', oneMeter);
+    expect(s.importError, isNull);
+    expect(s.status, CsvStatus.ready);
+  });
+
+  test('loadDefaultAsset failure ends in error, not eternal loading', () async {
+    final original = CsvState.defaultAssetKey;
+    addTearDown(() => CsvState.defaultAssetKey = original);
+    CsvState.defaultAssetKey = 'assets/does_not_exist.csv';
+
+    final s = CsvState();
+    expect(s.status, CsvStatus.loading);
+
+    await s.loadDefaultAsset();
+
+    expect(s.status, CsvStatus.error);
+    expect(s.errorMessage, isNotNull);
+    expect(s.rows, isEmpty);
+  });
+
+  test('loadDefaultAsset failure over a good file only sets importError', () async {
+    final s = CsvState();
+    s.setCsvForTest('good.csv', oneMeter);
+
+    final original = CsvState.defaultAssetKey;
+    addTearDown(() => CsvState.defaultAssetKey = original);
+    CsvState.defaultAssetKey = 'assets/does_not_exist.csv';
+
+    await s.loadDefaultAsset();
+
+    expect(s.status, CsvStatus.ready);
+    expect(s.rows, isNotEmpty);
+    expect(s.importError, isNotNull);
   });
 }
