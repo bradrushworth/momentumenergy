@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:momentum_energy/bar_chart.dart';
+import 'package:momentum_energy/widgets/chart_card.dart';
+import 'package:momentum_energy/widgets/legend_bar.dart';
 
 import 'test_data.dart';
 
@@ -73,6 +75,55 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('No data for Mon 7 Jul'), findsOneWidget);
+    });
+  });
+
+  group('ChartCard smoke', () {
+    testWidgets('renders title and trailing text', (tester) async {
+      await tester.pumpWidget(_host(
+        ChartCard(
+          title: 'Usage (kWh)',
+          trailing: '12.34 kWh',
+          chart: Container(),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Usage (kWh)'), findsOneWidget);
+      expect(find.text('12.34 kWh'), findsOneWidget);
+    });
+  });
+
+  group('LegendBar smoke', () {
+    testWidgets('renders Peak label', (tester) async {
+      await tester.pumpWidget(_host(
+        LegendBar(showSupply: false),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Peak'), findsOneWidget);
+    });
+
+    testWidgets('renders Supply label when showSupply is true', (tester) async {
+      await tester.pumpWidget(_host(
+        LegendBar(showSupply: true),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Supply'), findsOneWidget);
+    });
+
+    testWidgets('does not render Supply label when showSupply is false', (tester) async {
+      await tester.pumpWidget(_host(
+        LegendBar(showSupply: false),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Supply'), findsNothing);
     });
   });
 }
