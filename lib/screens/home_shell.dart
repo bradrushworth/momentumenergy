@@ -73,9 +73,18 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  /// The only surface for an import failure that lands on top of already-good
-  /// data: the tabs keep rendering the previous file, so without this the
-  /// failed import would look like nothing happened at all.
+  /// Shell-level surface for an import failure that left rows behind.
+  ///
+  /// It does NOT sit on top of the last good file: both tab bodies
+  /// early-return `csvStatusView` whenever `status != CsvStatus.ready`,
+  /// regardless of how many rows survived, so in this branch the banner
+  /// currently sits above three error bodies. What it adds is a single
+  /// dismissible report of the message that outlives tab switches.
+  ///
+  /// Making the tabs keep drawing the previous file needs two changes
+  /// together (the ledgered follow-up, neither in this task's scope):
+  /// `CsvState._parse` must stop clearing `rows` on failure, AND the tab
+  /// guards must key off `rows.isEmpty` instead of `status != ready`.
   Widget _errorBanner(String message) {
     return MaterialBanner(
       backgroundColor: _surface,
@@ -102,8 +111,9 @@ class _HomeShellState extends State<HomeShell> {
     final bool onboarding =
         state.status == CsvStatus.error && state.rows.isEmpty;
 
-    // A bad import over good data keeps the tabs (they still show the last
-    // good file) and reports the failure above them.
+    // A bad import that left rows behind: keep the tabs mounted (each renders
+    // its own error body today — see [_errorBanner]) and add the dismissible
+    // report of the failure above them.
     final String? error = state.errorMessage;
     final bool showError = !onboarding &&
         state.status == CsvStatus.error &&
