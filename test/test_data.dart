@@ -8,6 +8,11 @@
 /// 08/07/25 (07/07/25 was a Monday, matching the real export era).
 final List<List<dynamic>> rowsFor2Days = _buildRowsFor2Days();
 
+/// Raw CSV text producing the exact same rows as [rowsFor2Days] — for
+/// `CsvState.setCsvForTest` in screen-level tests that need to exercise the
+/// real parse path rather than pre-parsed rows.
+final String csvFor2Days = _buildCsvFor2Days();
+
 List<List<dynamic>> _buildRowsFor2Days() {
   final rows = <List<dynamic>>[];
   for (final day in ['07', '08']) {
@@ -22,4 +27,17 @@ List<List<dynamic>> _buildRowsFor2Days() {
     }
   }
   return rows;
+}
+
+String _buildCsvFor2Days() {
+  final buffer = StringBuffer('Date and Time, kWh, Quality\n');
+  for (final day in ['07', '08']) {
+    for (int i = 0; i < 48; i++) {
+      final h = i ~/ 2;
+      final m = (i % 2) * 30;
+      buffer.writeln(
+          '$day/07/25 ${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}, 0.5, Actual');
+    }
+  }
+  return buffer.toString();
 }
