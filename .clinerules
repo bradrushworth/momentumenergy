@@ -9,9 +9,24 @@ Momentum Energy (Australia) electricity usage from a downloaded CSV export.
 
 ## Commands
 - `flutter pub get` - install/refresh dependencies.
-- `flutter test` - run the test suite (aggregation logic + widget test).
-- `flutter analyze` - static analysis. Pre-existing SDK deprecation/info
-  warnings are expected; treat any NEW error as a regression.
+- `flutter test` - run the test suite (~48 tests: aggregation logic, CSV
+  state, and real widget suites for every screen).
+- `flutter analyze` - static analysis. The baseline is 29 pre-existing
+  SDK deprecation/info warnings; treat any NEW error/warning as a regression.
+
+## Architecture
+- `CsvState` (`lib/state/csv_state.dart`, a `ChangeNotifier` behind
+  `provider`) parses the CSV once; `HomeShell` hosts the Data / Days / Weeks
+  tabs plus the Settings and DayDetail routes. Screens never parse - they
+  pass `state.rows` to `DataAggregator` for bars and to `windowTotals`
+  (`lib/state/day_math.dart`) for the headline numbers, so printed totals
+  are by construction the sum of the drawn bars.
+- Two failure surfaces: `status == error` (+ `errorMessage`) means NOTHING
+  can be drawn (`rows` empty, first load failed) and the shell shows
+  onboarding; `importError` means a later import failed while a good file is
+  still loaded, so `rows`/dates/`fileName` keep describing that file, the
+  tabs keep drawing it, and the shell shows a dismissible banner. Tab guards
+  key off `rows.isEmpty`, never `status != ready`.
 
 ## Data source
 - Unlike the Amber app, this one does NOT call an API. The user downloads a
@@ -21,12 +36,24 @@ Momentum Energy (Australia) electricity usage from a downloaded CSV export.
 - Parsing uses the `csv` package (`CsvToListConverter`). The test fixture is
   `assets/Your_Usage_List_Sample.csv`.
 - Source rows are 5-minute intervals (`METER_INTERVAL = 5`).
+- Momentum's export occasionally carries a stray error-message row.
+  `CsvState._parse` drops any row failing a shape check (>= 2 fields, a
+  numeric kWh, a >= 14-char timestamp) before any date is parsed; fewer than
+  two survivors is a clean parse failure, not a `RangeError`.
+- Meter detection lives in `DataAggregator.detectNumMeters` only, called
+  once per file by `CsvState`.
 
 ## Tests
 - `test/bar_chart_test.dart` - `DataAggregator` aggregation tests. The ''1 Day''
   test asserts 48 half-hour bars and that each bar sums 6 x 5-minute values
   (e.g. 0.018 + 0.015 + ... + 0.019).
-- `test/widget_test.dart` - basic widget smoke test.
+- `test/csv_state_test.dart` - meter/date detection, junk-row filtering, and
+  the `error` vs `importError` split.
+- Real widget suites per screen: `home_shell_test`, `data_tab_test`,
+  `history_tab_test`, `settings_test`, `onboarding_test`,
+  `widget_smoke_test`; shared fixtures in `test/test_data.dart`.
+- `test/widget_test.dart` (the commented-out counter tombstone) is DELETED.
+  Do not recreate it.
 
 ## Chart aggregation model (IMPORTANT)
 - Graph bars are FIXED **half-hour buckets**: 2 bars/hour = 48 bars/day. This
@@ -49,12 +76,18 @@ Momentum Energy (Australia) electricity usage from a downloaded CSV export.
   in half-hour units (e.g. `graphPos < 7 * 2` = before 07:00).
 
 ## Versioning
-- `pubspec.yaml`: `version: x.y.z+build` (e.g. `1.3.2+19`).
+- `pubspec.yaml`: `version: x.y.z+build` (e.g. `1.3.3+22`).
+- **Bump `appVersion` in `lib/version.dart` in the same commit** - the
+  Settings > About screen shows it, and the two drift silently otherwise.
 
 ## Deployment
 - No local deploy script. CI is Codemagic. **Push to `origin/master`** to
-  trigger the build/deploy (web, Android, iOS). Configured via the Codemagic
-  dashboard (no `codemagic.yaml` in the repo).
+  trigger the build/deploy (web, Android, iOS). Still configured via the
+  Codemagic dashboard's Workflow Editor; the committed `codemagic.yaml` is
+  inert documentation of that workflow until the app is switched to YAML.
+- Feature commits carry `[skip ci]`, so a **merge commit without `[skip ci]`
+  triggers a release build**. Fast-forward, or make that merge a deliberate
+  release.
 
 ## Gotchas
 - Test runs can fail with a locked build dir (`build\unit_test_assets`). Fix
