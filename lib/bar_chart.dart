@@ -1,19 +1,9 @@
 import 'dart:collection';
 import 'dart:math';
 
-import 'package:csv/csv.dart';
-import 'package:csv/csv_settings_autodetection.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:momentum_energy/my_theme_model.dart';
 import 'package:momentum_energy/tariffs.dart';
-import 'package:provider/provider.dart';
-import 'package:vector_math/vector_math.dart' as math;
-
-import 'top_section.dart';
-
-const String cancelled = 'Cancelled';
-const String loading = 'Loading';
 
 const int METER_INTERVAL = 5; // minutes
 
@@ -35,14 +25,22 @@ final List<Color> colors = [
 ];
 
 class BarChartWidget1 extends StatefulWidget {
-  late String rawData;
+  // Input is PARSED rows (CsvState owns parsing now); an empty list means
+  // "no data for this window" and is rendered directly by this widget rather
+  // than callers juggling loading/cancelled sentinel strings.
+  late List<List<dynamic>> rows;
+  late int numMeters;
   late String title;
-  late final Duration duration;
-  late final Duration ending;
-  bool prices;
+  late Duration duration;
+  late Duration ending;
+  final bool prices;
+  final bool allowPartial;
 
-  BarChartWidget1(this.rawData, this.title, this.duration,
-      {Key? key, this.ending = const Duration(days: 0), this.prices = false})
+  BarChartWidget1(this.rows, this.numMeters, this.title, this.duration,
+      {Key? key,
+      this.ending = const Duration(days: 0),
+      this.prices = false,
+      this.allowPartial = false})
       : super(key: key);
 
   @override
@@ -50,244 +48,184 @@ class BarChartWidget1 extends StatefulWidget {
 }
 
 class BarChartState extends State<BarChartWidget1> {
-  late String _rawData;
-  late final String _title;
-  late final Duration _duration;
-  late final Duration _ending;
-  late final bool _prices;
+  // NONE of these may be `late final`. Flutter reuses a State object whenever
+  // the new widget has the same runtimeType and key at the same tree
+  // position, so a Cost -> Usage metric switch in the history feed hands
+  // this State a brand-new BarChartWidget1 with different flags. Caching the
+  // first widget's values in final fields made the chart keep drawing its
+  // first metric forever (only the card's title/trailing text changed). See
+  // _syncFromWidget.
+  List<List<dynamic>> _rows = const [];
+  int _numMeters = 1;
+  String _title = '';
+  Duration _duration = Duration.zero;
+  Duration _ending = Duration.zero;
+  bool _prices = false;
+  bool _allowPartial = false;
   List<BarChartGroupData> _barChartData = [];
   Map<int, String> _barChartTitles = {};
-  bool _loading = true;
-  bool _cancelled = false;
   bool _notEnoughData = false;
-  bool _hasControlled = false;
+
+  /// The `prices` flag used by the most recently completed aggregation.
+  /// Exposed for the keyless metric-change regression test: it only flips
+  /// once `_syncFromWidget` + `parseFile` actually ran, proving the State
+  /// re-synced instead of keeping stale `late final` inputs.
+  @visibleForTesting
+  bool get lastParsePrices => _prices;
 
   @override
-  initState() {
+  void initState() {
     super.initState();
-    _rawData = widget.rawData;
+    _syncFromWidget();
+    parseFile();
+  }
+
+  /// Copy every rendering input off the current widget. Returns true when
+  /// any of them actually changed, i.e. when the cached aggregation is
+  /// stale.
+  bool _syncFromWidget() {
+    final changed = _rows != widget.rows ||
+        _numMeters != widget.numMeters ||
+        _title != widget.title ||
+        _duration != widget.duration ||
+        _ending != widget.ending ||
+        _prices != widget.prices ||
+        _allowPartial != widget.allowPartial;
+    _rows = widget.rows;
+    _numMeters = widget.numMeters;
     _title = widget.title;
     _duration = widget.duration;
     _ending = widget.ending;
     _prices = widget.prices;
-    parseFile();
+    _allowPartial = widget.allowPartial;
+    return changed;
   }
 
   @override
   void didUpdateWidget(BarChartWidget1 oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.rawData != oldWidget.rawData) {
-      //print('new didUpdateWidget _notEnoughData=$_notEnoughData _title=$_title');
-      refresh(widget.rawData);
+    // Re-sync EVERY input (not just rows) and re-aggregate when anything
+    // moved: the history feed's metric chips swap `prices` on a reused
+    // State, and the window params can change with the data.
+    if (_syncFromWidget()) {
       parseFile();
-    } else {
-      //print('old didUpdateWidget _notEnoughData=$_notEnoughData _title=$_title');
     }
-  }
-
-  void refresh(String rawData) {
-    setState(() {
-      _rawData = rawData;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    //print('new build');
-    return Consumer<MyThemeModel>(
-      builder: (context, themeModel, child) {
-        return Column(
-          children: _loading
-              ? [
-                  const Spacer(),
-                  Text(
-                    'Data is loading for:\n$_title',
-                    textAlign: TextAlign.center,
-                  ),
-                  const Spacer()
-                ]
-              : _cancelled
-                  ? [
-                      const Spacer(),
-                      Text(
-                        'User cancelled import for:\n$_title',
-                        textAlign: TextAlign.center,
-                      ),
-                      const Spacer()
-                    ]
-                  : _notEnoughData
-                      ? [
-                          const Spacer(),
-                          Text(
-                            'Not enough data in file for:\n$_title',
-                            textAlign: TextAlign.center,
-                          ),
-                          const Spacer()
-                        ]
-                      : [
-                          TopSectionWidget(
-                            title: _title,
-                            legends: [
-                              if (_prices) Legend(title: 'Supply', color: colors[0]),
-                              Legend(title: 'Off Peak', color: colors[2]),
-                              Legend(title: 'Shoulder', color: colors[3]),
-                              Legend(title: 'Peak', color: colors[4]),
-                              // Only multi-meter exports have a controlled load
-                              if (_hasControlled) Legend(title: 'Control', color: colors[1]),
-                            ],
-                            padding: const EdgeInsets.only(left: 3, right: 3, top: 3, bottom: 3),
-                          ),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
-                              child: BarChart(
-                                BarChartData(
-                                  barGroups: _barChartData,
-                                  //[BarChartGroupData(x: 0, barRods: [makeRodData(80)]),],
-                                  titlesData: FlTitlesData(
-                                    rightTitles:
-                                        const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                    topTitles:
-                                        const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                    bottomTitles: AxisTitles(
-                                        sideTitles: SideTitles(
-                                      reservedSize: 30,
-                                      showTitles: true,
-                                      interval: 2, // Not working anymore for some reason
-                                      getTitlesWidget: (xValue, titleMeta) {
-                                        return SideTitleWidget(
-                                          axisSide: AxisSide.bottom,
-                                          angle: math.radians(-90),
-                                          space: 9,
-                                          child: Text(
-                                            xValue.toInt() % 2 == 0
-                                                ? _barChartTitles[xValue.toInt()]!
-                                                : '',
-                                            // Workaround
-                                            style: const TextStyle(fontSize: 8),
-                                          ),
-                                        );
-                                      },
-                                    )),
-                                    leftTitles: AxisTitles(
-                                        sideTitles: SideTitles(
-                                            showTitles: true,
-                                            //interval: 1,
-                                            reservedSize: 40,
-                                            getTitlesWidget: (xValue, titleMeta) {
-                                              String formattedNumber;
-                                              if (xValue < 1) {
-                                                formattedNumber = xValue.toStringAsFixed(2);
-                                              } else {
-                                                formattedNumber = xValue.toStringAsFixed(0);
-                                              }
-                                              return SideTitleWidget(
-                                                axisSide: AxisSide.left,
-                                                //child: Text(xValue == xValue.roundToDouble() ? "$xValue" : ''),
-                                                child: Text(
-                                                  (_prices ? '\$' : '') + formattedNumber,
-                                                  style: const TextStyle(fontSize: 9),
-                                                ),
-                                              );
-                                            })),
-                                  ),
-                                  //maxY: 10.0,
-                                  gridData: const FlGridData(show: false),
-                                  borderData: FlBorderData(show: false),
-                                ),
-                                swapAnimationDuration:
-                                    Duration.zero, // Duration(milliseconds: 1500)
+    if (_rows.isEmpty) {
+      return Text('No data for $_title');
+    }
+    return Column(
+      children: _notEnoughData
+          ? [
+              const Spacer(),
+              Text(
+                'Not enough data available for:\n$_title',
+                textAlign: TextAlign.center,
+              ),
+              const Spacer()
+            ]
+          : [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+                  child: BarChart(
+                    BarChartData(
+                      barGroups: _barChartData,
+                      titlesData: FlTitlesData(
+                        rightTitles:
+                            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles:
+                            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                          reservedSize: 30,
+                          showTitles: true,
+                          interval: 2, // One label slot per hour (48 half-hour bars).
+                          getTitlesWidget: (xValue, titleMeta) {
+                            int graphPos = xValue.toInt();
+                            return SideTitleWidget(
+                              axisSide: AxisSide.bottom,
+                              angle: 0,
+                              space: 9,
+                              child: Text(
+                                // Every 3 hours (6 half-hour bars) horizontal.
+                                graphPos % 6 == 0 ? _barChartTitles[graphPos]! : '',
+                                style: const TextStyle(fontSize: 8),
                               ),
-                            ),
-                          ),
-                        ],
-        );
-      },
+                            );
+                          },
+                        )),
+                        leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 40,
+                                getTitlesWidget: (xValue, titleMeta) {
+                                  String formattedNumber = titleMeta.max < 1
+                                      ? xValue.toStringAsFixed(2)
+                                      : xValue.toStringAsFixed(1);
+                                  return SideTitleWidget(
+                                    axisSide: AxisSide.left,
+                                    child: Text(
+                                      // The unit is derived here and ONLY
+                                      // here.
+                                      _prices ? '\$$formattedNumber' : '$formattedNumber kWh',
+                                      style: const TextStyle(fontSize: 9),
+                                    ),
+                                  );
+                                })),
+                      ),
+                      barTouchData: BarTouchData(
+                        enabled: true,
+                        handleBuiltInTouches: true,
+                        touchTooltipData: BarTouchTooltipData(
+                          getTooltipItem: (group, gi, rod, ri) {
+                            final label = _barChartTitles[group.x] ?? '';
+                            final unit = _prices ? ' \$' : ' kWh';
+                            return BarTooltipItem(
+                                '$label\n${rod.toY.toStringAsFixed(_prices ? 2 : 3)}$unit',
+                                const TextStyle(color: Colors.white, fontSize: 11));
+                          },
+                        ),
+                      ),
+                      gridData: const FlGridData(show: false),
+                      borderData: FlBorderData(show: false),
+                    ),
+                    duration: Duration.zero,
+                  ),
+                ),
+              ),
+            ],
     );
   }
 
   void parseFile() {
-    if (_rawData.isEmpty) {
+    if (_rows.isEmpty) {
       setState(() {
         _barChartData = [];
         _barChartTitles = {};
-        _loading = false;
-        _cancelled = false;
-        _notEnoughData = true;
-      });
-      return;
-    }
-    if (_rawData == loading) {
-      setState(() {
-        _barChartData = [];
-        _barChartTitles = {};
-        _loading = true;
-        _cancelled = false;
-        _notEnoughData = false;
-      });
-      return;
-    }
-    if (_rawData == cancelled) {
-      setState(() {
-        _barChartData = [];
-        _barChartTitles = {};
-        _loading = false;
-        _cancelled = true;
         _notEnoughData = false;
       });
       return;
     }
 
-    //final rawData = await rootBundle.loadString(filepath);
-    List<List<dynamic>> data = const CsvToListConverter(
-            csvSettingsDetector: FirstOccurrenceSettingsDetector(eols: ['\r\n', '\n']))
-        .convert(_rawData, shouldParseNumbers: true);
-    if (data.isEmpty) {
-      //print('Data was empty!');
-      setState(() {
-        _barChartData = [];
-        _barChartTitles = {};
-        _loading = false;
-        _cancelled = false;
-        _notEnoughData = true;
-      });
-      return;
-    }
-    //print('Updating data!');
-    List<dynamic> fieldNames = data.removeAt(0);
-    if (data.isEmpty) {
-      //print('Data only had field names!');
-      setState(() {
-        _barChartData = [];
-        _barChartTitles = {};
-        _loading = false;
-        _cancelled = false;
-        _notEnoughData = true;
-      });
-      return;
-    }
-    DataAggregator dataAggregator = DataAggregator(_duration, _ending, _prices);
+    DataAggregator dataAggregator = DataAggregator(_duration, _ending, _prices,
+        numMeters: _numMeters, allowPartial: _allowPartial);
     try {
-      dataAggregator.aggregateData(data);
+      dataAggregator.aggregateData(_rows);
 
       setState(() {
         _barChartData = dataAggregator.newData.values.toList();
         _barChartTitles = dataAggregator.newTitles;
-        _hasControlled = dataAggregator._numMeters > 1;
-        _loading = false;
-        _cancelled = false;
         _notEnoughData = false;
       });
-      //print('Data updated successfully!');
-    } on NotEnoughDataException catch (e) {
-      // Data exists but not enough for this particular chart
-      //print('NotEnoughDataException!');
-
+    } on NotEnoughDataException {
+      // Data exists but not enough for this particular chart.
       setState(() {
         _barChartData = [];
         _barChartTitles = {};
-        _loading = false;
-        _cancelled = false;
         _notEnoughData = true;
       });
     }
@@ -300,14 +238,18 @@ class DataAggregator {
 
   late final Duration _duration, _ending;
   late final bool _prices;
-  int _numMeters = 1;
+  final int _numMeters;
+  final bool _allowPartial;
   // True when every in-range record fell on a weekend; single-day weekend
   // charts then colour their bars off-peak to match how they are billed.
   bool _allWeekend = false;
 
-  DataAggregator(this._duration, this._ending, this._prices);
+  DataAggregator(this._duration, this._ending, this._prices,
+      {required int numMeters, bool allowPartial = false})
+      : _numMeters = numMeters,
+        _allowPartial = allowPartial;
 
-  String dateParse(String input) {
+  static String dateParse(String input) {
     // e.g. 13/12/21 02:30
     return '20' +
         input.substring(6, 8) +
@@ -320,19 +262,23 @@ class DataAggregator {
         ':00';
   }
 
-  aggregateData(List<List<dynamic>> data) {
-    // Meters show up as consecutive rows sharing one timestamp. Current
-    // single-meter exports have unique timestamps, so the count naturally
-    // stops at 1 (the old first-repeat scan ran to data.length there and
-    // rendered nothing).
+  /// Meters show up as consecutive rows sharing one timestamp.
+  ///
+  /// The single implementation of that rule: `CsvState._parse` calls it once
+  /// per file and passes the answer to every `DataAggregator` through
+  /// `numMeters`, so nothing re-detects per aggregate. Returns 1 for an
+  /// empty list.
+  static int detectNumMeters(List<List<dynamic>> data) {
+    if (data.isEmpty) return 1;
     int numMeters = 1;
-    final String firstDate = data.first[0];
+    final firstDate = data.first[0];
     while (numMeters < data.length && data[numMeters][0] == firstDate) {
       numMeters++;
     }
-    _numMeters = numMeters;
-    //print('numMeters=$numMeters');
+    return numMeters;
+  }
 
+  aggregateData(List<List<dynamic>> data) {
     DateTime latest = DateTime.parse(dateParse(data.last[0]).substring(0, 8))
         .subtract(_ending)
         .add(const Duration(days: 1));
@@ -347,7 +293,7 @@ class DataAggregator {
     bool sawWeekday = false;
     bool sawWeekend = false;
 
-    for (int n = 0; n < data.length; n += numMeters) {
+    for (int n = 0; n < data.length; n += _numMeters) {
       List<dynamic> record = data[n];
       //print("adding record[0]=${record[0]}");
       DateTime date = DateTime.parse(dateParse(record[0]));
@@ -366,7 +312,7 @@ class DataAggregator {
       //print('Allowed date=$date');
 
       int graphPos = date.hour * 2 + date.minute ~/ 30;
-      newTitles[graphPos] = newTitles[graphPos] ?? date.toString().substring(11, 16);
+      newTitles[graphPos] ??= _canonicalHalfHour(graphPos);
 
       if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
         sawWeekend = true;
@@ -374,13 +320,13 @@ class DataAggregator {
         sawWeekday = true;
       }
 
-      for (int meterNum = 0; meterNum < numMeters; meterNum++) {
+      for (int meterNum = 0; meterNum < _numMeters; meterNum++) {
         record = data[n + meterNum];
         //print("adding date=$date record[1]=${record[1]}");
         stackedValue[graphPos] = (stackedValue[graphPos] ?? 0.0) +
             (_prices ? _getCost(meterNum, date.weekday, graphPos, 0.0 + record[1]) : record[1]);
         stackedValues[graphPos] = (stackedValues[graphPos] ??
-            List<double>.generate(numMeters + (_prices ? 1 : 0), (index) => 0.0));
+            List<double>.generate(_numMeters + (_prices ? 1 : 0), (index) => 0.0));
         stackedValues[graphPos]![meterNum] = (stackedValues[graphPos]![meterNum]) +
             (_prices ? _getCost(meterNum, date.weekday, graphPos, 0.0 + record[1]) : record[1]);
       }
@@ -389,7 +335,7 @@ class DataAggregator {
         double dailySupplyChargePerInterval = tariffs.daily / 24 / (60 / METER_INTERVAL);
         double dailySupplyChargePer30Mins = tariffs.daily / 24 / 2;
         stackedValue[graphPos] = stackedValue[graphPos]! + dailySupplyChargePerInterval;
-        stackedValues[graphPos]![numMeters] = dailySupplyChargePer30Mins * _duration.inDays;
+        stackedValues[graphPos]![_numMeters] = dailySupplyChargePer30Mins * _duration.inDays;
       }
     }
 
@@ -397,8 +343,18 @@ class DataAggregator {
 
     //print('beforeRange=$beforeRange afterRange=$afterRange');
     if (!beforeRange || !afterRange) {
-      // If there wasn't enough data to answer the questions
-      throw NotEnoughDataException();
+      if (!_allowPartial) {
+        // If there wasn't enough data to answer the questions
+        throw NotEnoughDataException();
+      }
+
+      // Fill in any missing graph positions with zeros.
+      for (int graphPos = 0; graphPos < 48; graphPos++) {
+        stackedValue[graphPos] ??= 0.0;
+        stackedValues[graphPos] ??=
+            List<double>.generate(_numMeters + (_prices ? 1 : 0), (index) => 0.0);
+        newTitles[graphPos] ??= _canonicalHalfHour(graphPos);
+      }
     }
 
     for (int graphPos in stackedValue.keys) {
@@ -415,28 +371,31 @@ class DataAggregator {
     return ((value * mod).roundToDouble() / mod);
   }
 
+  // Canonical per-half-hour label (00:00, 00:30, ...), derived from the bar
+  // index so a filled (allowPartial) slot with no source record still gets a
+  // correct label.
+  static String _canonicalHalfHour(int graphPos) {
+    final int h = graphPos ~/ 2;
+    final int m = (graphPos % 2) * 30;
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+  }
+
   BarChartRodData makeRodData(int graphPos, double value, List<double> stackedValues) {
     double rodCumulative = 0.0;
     int i = 0;
     //print("meterNum=$meterNum");
     return BarChartRodData(
       toY: roundDouble(value, _prices ? 2 : 3),
-      color: Colors.white70,
+      // Transparent, not a colour: the rod is only a backdrop for
+      // `rodStackItems`, which carry every visible segment. A solid rod
+      // showed through above the stack as a grey tip.
+      color: Colors.transparent,
       width: 6, // / _duration.inDays,
       //borderRadius: BorderRadius.circular(2),
       rodStackItems: stackedValues
           .map((e) => BarChartRodStackItem(rodCumulative,
               rodCumulative += roundDouble(e, _prices ? 2 : 3), _getCostColor(i++, graphPos)))
           .toList(),
-      // backDrawRodData: BackgroundBarChartRodData(
-      //   show: true,
-      //   colors: [
-      //     _themeModel.isDark()
-      //         ? const Color(0xFF1D1D2B)
-      //         : const Color(0xFFFCFCFC)
-      //   ],
-      //   y: value * 1.2, // Dark background bar
-      // ),
     );
   }
 
