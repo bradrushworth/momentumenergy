@@ -307,7 +307,7 @@ class DataAggregator {
 
   DataAggregator(this._duration, this._ending, this._prices);
 
-  String dateParse(String input) {
+  static String dateParse(String input) {
     // e.g. 13/12/21 02:30
     return '20' +
         input.substring(6, 8) +
