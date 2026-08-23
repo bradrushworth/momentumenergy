@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:momentum_energy/screens/settings_screen.dart';
 import 'package:momentum_energy/state/csv_state.dart';
 import 'package:momentum_energy/tariffs.dart';
+import 'package:momentum_energy/version.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -48,6 +49,32 @@ void main() {
       tariffs.shoulder = defaults.shoulder;
       tariffs.peak = defaults.peak;
     }
+  });
+
+  testWidgets('About ends with a non-tappable version tile', (tester) async {
+    // The rate fields plus About run past the default 800x600 surface, and a
+    // ListView only builds what it lays out — give it room instead.
+    final originalSize = tester.view.physicalSize;
+    final originalRatio = tester.view.devicePixelRatio;
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.physicalSize = originalSize;
+      tester.view.devicePixelRatio = originalRatio;
+    });
+
+    await tester.pumpWidget(_host(CsvState()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('ABOUT'), findsOneWidget);
+    expect(find.text('Version'), findsOneWidget);
+    expect(find.text(appVersion), findsOneWidget);
+    // Version is a fact, not a link: unlike every other About tile it has no
+    // onTap.
+    expect(
+      tester.widget<ListTile>(find.widgetWithText(ListTile, 'Version')).onTap,
+      isNull,
+    );
   });
 
   testWidgets('valid save mutates tariffs and bumps revision', (tester) async {

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../bar_chart.dart';
 import '../state/csv_state.dart';
 import '../state/day_math.dart';
+import '../state/formats.dart';
 import '../widgets/chart_card.dart';
 import '../widgets/legend_bar.dart';
 import '../widgets/status_views.dart';
@@ -41,10 +41,11 @@ class DataTab extends StatelessWidget {
   }
 
   Widget _body(CsvState state) {
-    // Belt-and-braces: CsvState._parse never leaves `ready` with empty rows
-    // (an empty CSV throws to `error` first), but windowTotals throws on
-    // empty rows, so never call it without this guard.
-    if (state.status != CsvStatus.ready || state.rows.isEmpty) {
+    // Keyed on the rows, not on `status`: a failed re-import leaves the last
+    // good file loaded, and this tab must keep drawing it (the shell reports
+    // the failure in a banner). windowTotals throws on empty rows, so never
+    // call it without this guard.
+    if (csvNeedsStatusView(state)) {
       return csvStatusView(state);
     }
     return _ReadyBody(state: state);
@@ -64,11 +65,12 @@ class _ReadyBody extends StatelessWidget {
     final firstDate = state.firstDate!;
     final lastDate = state.lastDate!;
 
-    final totals = windowTotals(rows, numMeters, Duration(days: dayCount), Duration.zero);
+    final totals = windowTotals(rows, numMeters, Duration(days: dayCount), Duration.zero,
+        revision: state.tariffsRevision);
     final avgPerDay = dayCount > 0 ? totals.cost / dayCount : 0.0;
 
-    final bigLine = '${DateFormat('E d MMM').format(firstDate)} – '
-        '${DateFormat('E d MMM yyyy').format(lastDate)}';
+    final bigLine = '${dayFormat.format(firstDate)} – '
+        '${dayYearFormat.format(lastDate)}';
     final meterWord = numMeters == 1 ? 'meter' : 'meters';
     final subLine = '${state.fileName} · $numMeters $meterWord · $dayCount days';
 
@@ -129,15 +131,20 @@ class _ReadyBody extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _dayCard(rows, numMeters, lastDate, 0),
-        const SizedBox(height: 12),
-        _dayCard(rows, numMeters, lastDate, 1),
+        // A one-day export has no second day to chart: without this guard the
+        // e=1 card renders an empty "day before the file starts".
+        if (dayCount > 1) ...[
+          const SizedBox(height: 12),
+          _dayCard(rows, numMeters, lastDate, 1),
+        ],
       ],
     );
   }
 
   Widget _dayCard(List<List<dynamic>> rows, int numMeters, DateTime lastDate, int e) {
-    final title = DateFormat('E d MMM').format(lastDate.subtract(Duration(days: e)));
-    final dayTotals = windowTotals(rows, numMeters, const Duration(days: 1), Duration(days: e));
+    final title = dayFormat.format(lastDate.subtract(Duration(days: e)));
+    final dayTotals = windowTotals(rows, numMeters, const Duration(days: 1), Duration(days: e),
+        revision: state.tariffsRevision);
 
     return ChartCard(
       title: title,

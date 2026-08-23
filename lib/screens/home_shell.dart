@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../state/csv_state.dart';
+import '../state/formats.dart';
 import 'data_tab.dart';
 import 'history_tab.dart';
 import 'onboarding.dart';
@@ -15,6 +15,10 @@ import 'settings_screen.dart';
 /// When the CSV failed to parse and no rows survive, the body is [Onboarding]
 /// instead of the tabs — Momentum ships a bundled sample, so that only happens
 /// after a genuinely unreadable import (or an unreadable bundle).
+///
+/// When an import fails but a good file is still loaded
+/// ([CsvState.importError]), the tabs keep drawing that file and the failure
+/// is reported once, here, in a dismissible [MaterialBanner].
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -28,25 +32,25 @@ class _HomeShellState extends State<HomeShell> {
   static const Color _indicator = Color(0xFF2E2E3E);
   static const Color _muted = Color(0xFF9595A4);
 
-  static final DateFormat _dayFormat = DateFormat('E d MMM');
-
   int _tab = 0;
 
-  /// The [CsvState.errorMessage] the user has already dismissed. The error
-  /// banner reappears as soon as the message *changes* (a new failure), but a
+  /// The [CsvState.importError] the user has already dismissed. The banner
+  /// reappears as soon as the message *changes* (a new failure), but a
   /// dismissed message stays hidden while the same error keeps being re-set
   /// (e.g. retrying the same broken file).
   String? _dismissedError;
 
-  /// `Mon 7 Jul – Tue 8 Jul` for the loaded export; empty until a parse has
-  /// actually produced dates (the shell renders during `loading` too).
+  /// `Mon 7 Jul – Tue 8 Jul` for the file currently on screen; empty until a
+  /// parse has actually produced dates (the shell renders during `loading`
+  /// too). Keyed on the rows, so a failed import keeps describing the file
+  /// the tabs are still drawing rather than blanking out.
   String _contextLine(CsvState state) {
     final first = state.firstDate;
     final last = state.lastDate;
-    if (state.status != CsvStatus.ready || first == null || last == null) {
+    if (state.rows.isEmpty || first == null || last == null) {
       return '';
     }
-    return '${_dayFormat.format(first)} – ${_dayFormat.format(last)}';
+    return '${dayFormat.format(first)} – ${dayFormat.format(last)}';
   }
 
   Widget _title(CsvState state) {
@@ -73,18 +77,11 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  /// Shell-level surface for an import failure that left rows behind.
-  ///
-  /// It does NOT sit on top of the last good file: both tab bodies
-  /// early-return `csvStatusView` whenever `status != CsvStatus.ready`,
-  /// regardless of how many rows survived, so in this branch the banner
-  /// currently sits above three error bodies. What it adds is a single
-  /// dismissible report of the message that outlives tab switches.
-  ///
-  /// Making the tabs keep drawing the previous file needs two changes
-  /// together (the ledgered follow-up, neither in this task's scope):
-  /// `CsvState._parse` must stop clearing `rows` on failure, AND the tab
-  /// guards must key off `rows.isEmpty` instead of `status != ready`.
+  /// Shell-level surface for an import failure that left the previous file
+  /// loaded: the banner sits directly on top of the tabs, which keep drawing
+  /// that file. It is the ONLY report of the failure — the tab bodies key off
+  /// `rows.isEmpty`, so none of them shows an error body — and being on the
+  /// shell it outlives tab switches.
   Widget _errorBanner(String message) {
     return MaterialBanner(
       backgroundColor: _surface,
@@ -109,16 +106,13 @@ class _HomeShellState extends State<HomeShell> {
     // over three identical error bodies, so walk the user through importing
     // a good export instead.
     final bool onboarding =
-        state.status == CsvStatus.error && state.rows.isEmpty;
+        state.rows.isEmpty && state.status == CsvStatus.error;
 
-    // A bad import that left rows behind: keep the tabs mounted (each renders
-    // its own error body today — see [_errorBanner]) and add the dismissible
-    // report of the failure above them.
-    final String? error = state.errorMessage;
-    final bool showError = !onboarding &&
-        state.status == CsvStatus.error &&
-        error != null &&
-        error != _dismissedError;
+    // A bad import over a good file: the tabs stay mounted and keep drawing
+    // the surviving file, with a dismissible report of the failure above.
+    final String? error = state.importError;
+    final bool showError =
+        error != null && state.rows.isNotEmpty && error != _dismissedError;
 
     return Scaffold(
       backgroundColor: _background,

@@ -29,6 +29,14 @@ void _portrait(WidgetTester t) {
 /// A state holding the two-day sample, parsed through the real CSV path.
 CsvState _ready() => CsvState()..setCsvForTest('export.csv', csvFor2Days);
 
+/// Not a usage export at all: no row survives the shape check, so the parse
+/// fails wherever it is fed in.
+const String _malformedCsv = 'not,a,usage,export\nsorry,an error occurred\n';
+
+/// The one message `CsvState` reports for an unreadable file.
+const String _formatMessage =
+    'Unrecognized file format — export the usage table from Momentum MyAccount and try again.';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -83,11 +91,13 @@ void main() {
   testWidgets('a parse error with no rows shows onboarding instead of the tabs',
       (t) async {
     _portrait(t);
-    // A malformed export drives CsvState into `error` with empty rows — the
-    // only state in which the shell has nothing at all to show.
-    final state = CsvState()..setCsvForTest('junk.csv', 'not,a,usage,export\n');
+    // A fresh state whose FIRST (and only) file is malformed: nothing ever
+    // parsed, so `error` with empty rows — the one state in which the shell
+    // has nothing at all to show.
+    final state = CsvState()..setCsvForTest('junk.csv', _malformedCsv);
     expect(state.status, CsvStatus.error);
     expect(state.rows, isEmpty);
+    expect(state.importError, isNull);
 
     await t.pumpWidget(_host(state));
     await t.pump();
@@ -100,30 +110,41 @@ void main() {
     expect(find.textContaining(' – '), findsNothing);
   });
 
-  testWidgets('a failed import over good data surfaces a dismissible banner',
+  testWidgets(
+      'a failed import over good data keeps the tabs and adds a dismissible banner',
       (t) async {
     _portrait(t);
-    // Good data already loaded, then a bad import fails: rows survive, so the
-    // shell keeps the tabs and reports the failure in a banner.
+    // The real path: a good file is loaded, then a malformed one is imported
+    // over it. No public field is poked — the whole point is that _parse's
+    // own failure handling keeps the good file on screen.
     final state = _ready();
-    const message =
-        'Unrecognized file format — export the usage table from Momentum MyAccount and try again.';
-    state.status = CsvStatus.error;
-    state.errorMessage = message;
-
     await t.pumpWidget(_host(state));
     await t.pump();
 
+    expect(find.byType(MaterialBanner), findsNothing);
+    expect(find.text('Tue 8 Jul'), findsWidgets);
+
+    state.setCsvForTest('junk.csv', _malformedCsv);
+    await t.pump();
+
+    // The good file survived, in the state AND on screen.
+    expect(state.rows, isNotEmpty);
+    expect(state.status, CsvStatus.ready);
+    expect(state.fileName, 'export.csv');
+    expect(state.importError, _formatMessage);
+    expect(find.text('Mon 7 Jul – Tue 8 Jul'), findsOneWidget);
+    expect(find.text('Tue 8 Jul'), findsWidgets);
+
+    // One report of the failure, in the banner — the tabs show no error body.
     expect(find.byType(MaterialBanner), findsOneWidget);
-    // Scoped to the banner: the selected tab's own error body repeats the
-    // same message underneath it.
     expect(
       find.descendant(
         of: find.byType(MaterialBanner),
-        matching: find.text(message),
+        matching: find.text(_formatMessage),
       ),
       findsOneWidget,
     );
+    expect(find.text(_formatMessage), findsOneWidget);
     // Still the tabbed shell, not onboarding.
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.text('1. Log in to Momentum MyAccount'), findsNothing);
@@ -131,23 +152,18 @@ void main() {
     await t.tap(find.widgetWithText(TextButton, 'Dismiss'));
     await t.pump();
 
-    // Dismissed locally even though the error is still set on the state.
+    // Dismissed locally even though importError is still set on the state.
     expect(find.byType(MaterialBanner), findsNothing);
-    expect(state.status, CsvStatus.error);
+    expect(state.importError, _formatMessage);
+    // ...and the data is untouched by the dismissal.
+    expect(find.text('Tue 8 Jul'), findsWidgets);
 
-    // A *different* message is a new failure, so the banner comes back.
-    state.errorMessage = 'Could not read the file.';
-    state.notifyListeners();
+    // A successful import clears the flag, so nothing is left to report.
+    state.setCsvForTest('export2.csv', csvFor2Days);
     await t.pump();
 
-    expect(find.byType(MaterialBanner), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(MaterialBanner),
-        matching: find.text('Could not read the file.'),
-      ),
-      findsOneWidget,
-    );
+    expect(state.importError, isNull);
+    expect(find.byType(MaterialBanner), findsNothing);
   });
 
   testWidgets('renders under the app dark theme', (t) async {

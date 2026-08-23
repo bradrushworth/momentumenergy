@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../state/csv_state.dart';
 import '../tariffs.dart';
 import '../utils.dart';
+import '../version.dart';
 
 const _kBg = Color(0xFF20202A);
 const _kAppBarBg = Color(0xFF1A1A26);
@@ -28,7 +29,8 @@ const _kSectionLabelStyle = TextStyle(
 ///
 /// The About section's four links are copied verbatim (scheme/host/path/
 /// query and the kIsWeb && kReleaseMode switch) from the deleted footer at
-/// lib/main.dart:430-509 (commit b1c6a38).
+/// lib/main.dart:430-509 (commit b1c6a38), followed by a non-tappable
+/// Version tile reading `lib/version.dart` (kept in sync with pubspec).
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -217,6 +219,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   query: 'subject=Help with Momentum Energy Dashboard',
                 ));
               },
+            ),
+            // Not tappable: the last line of About is a fact, not a link.
+            const ListTile(
+              title: Text('Version', style: TextStyle(color: Colors.white)),
+              subtitle: Text(appVersion, style: TextStyle(color: _kMuted)),
             ),
           ],
         ),

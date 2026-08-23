@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../bar_chart.dart';
 import '../state/csv_state.dart';
 import '../state/day_math.dart';
+import '../state/formats.dart';
 import '../widgets/chart_card.dart';
 import '../widgets/legend_bar.dart';
 import '../widgets/status_views.dart';
@@ -50,8 +50,6 @@ class HistoryTab extends StatefulWidget {
 class _HistoryTabState extends State<HistoryTab> {
   _Metric _metric = _Metric.cost;
 
-  static final _dayFormat = DateFormat('E d MMM');
-
   List<_Entry> _entries(CsvState state) =>
       widget.weeks ? _weekEntries(state) : _dayEntries(state);
 
@@ -69,7 +67,7 @@ class _HistoryTabState extends State<HistoryTab> {
         _Entry(
           duration: const Duration(days: 1),
           ending: Duration(days: e),
-          title: _dayFormat.format(lastDate.subtract(Duration(days: e))),
+          title: dayFormat.format(lastDate.subtract(Duration(days: e))),
           allowPartial: true,
         ),
     ];
@@ -89,7 +87,7 @@ class _HistoryTabState extends State<HistoryTab> {
         _Entry(
           duration: const Duration(days: 7),
           ending: Duration(days: w * 7),
-          title: 'Week to ${_dayFormat.format(lastDate.subtract(Duration(days: w * 7)))}',
+          title: 'Week to ${dayFormat.format(lastDate.subtract(Duration(days: w * 7)))}',
           allowPartial: true,
         ),
     ];
@@ -104,7 +102,8 @@ class _HistoryTabState extends State<HistoryTab> {
     final key = ValueKey<String>(
         '${widget.weeks ? 'w' : 'd'}|${entry.title}|${metric.name}|${state.tariffsRevision}');
 
-    final totals = windowTotals(state.rows, state.numMeters, entry.duration, entry.ending);
+    final totals = windowTotals(state.rows, state.numMeters, entry.duration, entry.ending,
+        revision: state.tariffsRevision);
 
     final Widget card;
     switch (metric) {
@@ -159,6 +158,7 @@ class _HistoryTabState extends State<HistoryTab> {
             numMeters: state.numMeters,
             duration: entry.duration,
             ending: entry.ending,
+            revision: state.tariffsRevision,
           ),
         ),
       ),
@@ -208,10 +208,11 @@ class _HistoryTabState extends State<HistoryTab> {
   Widget build(BuildContext context) {
     final state = context.watch<CsvState>();
 
-    // Belt-and-braces: CsvState._parse never leaves `ready` with empty rows,
-    // but windowTotals throws on empty rows, so never call it without this
-    // guard.
-    if (state.status != CsvStatus.ready || state.rows.isEmpty) {
+    // Keyed on the rows, not on `status`: a failed re-import leaves the last
+    // good file loaded and this feed keeps rendering it (the shell reports
+    // the failure in a banner). windowTotals throws on empty rows, so never
+    // call it without this guard.
+    if (csvNeedsStatusView(state)) {
       return csvStatusView(state);
     }
 

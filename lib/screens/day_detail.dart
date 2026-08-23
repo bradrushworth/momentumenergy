@@ -18,6 +18,10 @@ class DayDetail extends StatelessWidget {
   final Duration duration;
   final Duration ending;
 
+  /// `CsvState.tariffsRevision` at push time — only the `windowTotals` memo
+  /// key needs it, so a caller without a CsvState can leave it at 0.
+  final int revision;
+
   const DayDetail({
     super.key,
     required this.title,
@@ -25,6 +29,7 @@ class DayDetail extends StatelessWidget {
     required this.numMeters,
     required this.duration,
     required this.ending,
+    this.revision = 0,
   });
 
   Widget _statTile(String label, String value) {
@@ -65,7 +70,7 @@ class DayDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totals = windowTotals(rows, numMeters, duration, ending);
+    final totals = windowTotals(rows, numMeters, duration, ending, revision: revision);
     final supply = tariffs.daily * duration.inDays;
 
     return Scaffold(
