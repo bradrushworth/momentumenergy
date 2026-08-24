@@ -197,6 +197,30 @@ depends on portrait, or on a list being tall enough to build.
   `keys/keystore.jks` is already tracked; rotation via Play App Signing is
   the accepted fix — don't make it worse.
 
+## Store assets and the app icon
+
+`store/` holds everything the Play Store / App Store listings are built from,
+so the repo is the record of what is published:
+
+- `store/listing.md` — app name, short/full description, "What's new". Edit here
+  first, then paste into the console.
+- `store/screenshots/` — `play-*` 1080x1920, `ios-*` 1290x2796 (iPhone 6.7"),
+  `land-*` 1600x800. Regenerated from a real `flutter build web --release`
+  driven by headless Chrome, never mocked up.
+- `store/feature-graphic.png` (1024x500, Play only), `store/icon-512.png`.
+
+The launcher icon is generated, not hand-drawn: `assets/icon.png` (full-bleed
+1024x1024) and `assets/icon_foreground.png` (same art, transparent) feed
+`flutter_launcher_icons`. After changing either, run:
+
+```bash
+dart run flutter_launcher_icons
+```
+
+`adaptive_icon_foreground` is wrapped in a 16% inset by the generator, so the
+foreground must use the SAME geometry as the full icon — pre-shrinking it a
+second time makes the launcher icon look tiny.
+
 ## Gotchas
 
 - `flutter test` can fail on a locked `build\unit_test_assets` dir on
