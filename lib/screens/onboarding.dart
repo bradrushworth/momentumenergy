@@ -3,8 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../state/csv_state.dart';
 import '../utils.dart';
+import 'package:momentum_energy/theme.dart';
 
-const _kMuted = Color(0xFF9595A4);
+const _kMuted = MomentumPalette.muted;
 
 /// First-run helper shown by the shell only when the CSV failed to parse
 /// AND no rows are loaded (Momentum always ships the bundled sample, so an

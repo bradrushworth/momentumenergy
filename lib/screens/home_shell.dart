@@ -7,6 +7,7 @@ import 'data_tab.dart';
 import 'history_tab.dart';
 import 'onboarding.dart';
 import 'settings_screen.dart';
+import 'package:momentum_energy/theme.dart';
 
 /// Root screen: an app bar (app name + the loaded file's date range + import
 /// and Settings actions) over a three-tab body (Data / Days / Weeks) driven by
@@ -27,10 +28,9 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  static const Color _background = Color(0xFF20202A);
-  static const Color _surface = Color(0xFF1A1A26);
-  static const Color _indicator = Color(0xFF2E2E3E);
-  static const Color _muted = Color(0xFF9595A4);
+  static const Color _background = MomentumPalette.indigo;
+  static const Color _surface = MomentumPalette.surface;
+  static const Color _muted = MomentumPalette.muted;
 
   int _tab = 0;
 
@@ -157,7 +157,8 @@ class _HomeShellState extends State<HomeShell> {
           : NavigationBar(
               backgroundColor: _surface,
               surfaceTintColor: Colors.transparent,
-              indicatorColor: _indicator,
+              // Indicator/icon/label colours come from navigationBarTheme so
+              // the mint selection stays defined in one place.
               selectedIndex: _tab,
               onDestinationSelected: (i) => setState(() => _tab = i),
               destinations: const [

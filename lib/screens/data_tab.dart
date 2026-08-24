@@ -8,11 +8,11 @@ import '../state/formats.dart';
 import '../widgets/chart_card.dart';
 import '../widgets/legend_bar.dart';
 import '../widgets/status_views.dart';
+import 'package:momentum_energy/theme.dart';
 
-const _kMomentumPink = Color(0xFFFF3E8D);
-const _kHeroBg = Color(0xFF1A1A26);
-const _kTileBg = Color(0xFF23232F);
-const _kMuted = Color(0xFF9595A4);
+const _kHeroBg = MomentumPalette.surface;
+const _kTileBg = MomentumPalette.skeleton;
+const _kMuted = MomentumPalette.muted;
 
 /// The "Data" tab: a file-summary hero (date range, file name, meter/day
 /// counts, cost/usage totals, and an import button) above the two most
@@ -121,7 +121,8 @@ class _ReadyBody extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: state.importFile,
-                  style: FilledButton.styleFrom(backgroundColor: _kMomentumPink),
+                  // Mint, from filledButtonTheme — Momentum's own CTA colour.
+                  // The hardcoded pink here predates the brand palette.
                   icon: const Icon(Icons.upload_file),
                   label: const Text('Import new export'),
                 ),

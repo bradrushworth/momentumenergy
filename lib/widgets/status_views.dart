@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../state/csv_state.dart';
+import 'package:momentum_energy/theme.dart';
 
 const _kMomentumPink = Color(0xFFFF3E8D);
-const _kMuted = Color(0xFF9595A4);
+const _kMuted = MomentumPalette.muted;
 
 /// Whether a CsvState-driven screen has nothing of its own to draw and must
 /// fall back to [csvStatusView].

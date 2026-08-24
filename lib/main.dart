@@ -9,18 +9,64 @@ import 'package:momentum_energy/screenshots_mobile.dart'
     if (dart.library.js) 'package:momentum_energy/screenshots_other.dart';
 import 'package:momentum_energy/state/csv_state.dart';
 import 'package:momentum_energy/tariffs.dart';
+import 'package:momentum_energy/theme.dart';
 import 'package:provider/provider.dart';
 
 /// The app's only theme — the light theme and the runtime toggle
 /// (`MyThemeModel`) were removed in the UI overhaul; every screen is painted
-/// against `0xFF20202A` / `0xFF1A1A26`.
+/// against [MomentumPalette] — Momentum Energy's own indigo and mint, so the
+/// app looks like it belongs to the account the export came from.
 ///
-/// Carried over verbatim from the pre-overhaul `darkTheme` block. Public (not
-/// `_darkTheme`) only so `test/home_shell_test.dart` can pump the shell under
-/// the real theme.
+/// Material's dark defaults are what leaked the stock lilac into chips,
+/// buttons and the navigation bar, so the accent roles are pinned to the mint
+/// here rather than tinted from a seed. Public (not `_darkTheme`) only so
+/// `test/home_shell_test.dart` can pump the shell under the real theme.
 final ThemeData darkTheme = ThemeData.dark().copyWith(
+  scaffoldBackgroundColor: MomentumPalette.indigo,
+  primaryColor: MomentumPalette.mint,
+  colorScheme: const ColorScheme.dark(
+    primary: MomentumPalette.mint,
+    onPrimary: MomentumPalette.indigo,
+    secondary: MomentumPalette.mint,
+    onSecondary: MomentumPalette.indigo,
+    surface: MomentumPalette.indigo,
+    onSurface: Colors.white,
+  ),
   textTheme: const TextTheme(
-    bodyMedium: TextStyle(color: Color(0xFFA7A7A7), fontSize: 13),
+    bodyMedium: TextStyle(color: MomentumPalette.mutedBright, fontSize: 13),
+  ),
+  navigationBarTheme: NavigationBarThemeData(
+    backgroundColor: MomentumPalette.surface,
+    indicatorColor: MomentumPalette.mint,
+    iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
+        color: states.contains(WidgetState.selected)
+            ? MomentumPalette.indigo
+            : MomentumPalette.muted)),
+    labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
+        fontSize: 12,
+        fontWeight: states.contains(WidgetState.selected)
+            ? FontWeight.bold
+            : FontWeight.normal,
+        color: states.contains(WidgetState.selected)
+            ? Colors.white
+            : MomentumPalette.muted)),
+  ),
+  chipTheme: const ChipThemeData(
+    backgroundColor: MomentumPalette.surface,
+    selectedColor: MomentumPalette.mint,
+    labelStyle: TextStyle(color: Colors.white),
+    secondaryLabelStyle: TextStyle(color: MomentumPalette.indigo),
+    checkmarkColor: MomentumPalette.indigo,
+    side: BorderSide.none,
+  ),
+  filledButtonTheme: FilledButtonThemeData(
+    style: FilledButton.styleFrom(
+      backgroundColor: MomentumPalette.mint,
+      foregroundColor: MomentumPalette.indigo,
+    ),
+  ),
+  textButtonTheme: TextButtonThemeData(
+    style: TextButton.styleFrom(foregroundColor: MomentumPalette.mint),
   ),
 );
 

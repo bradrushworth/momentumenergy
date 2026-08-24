@@ -197,6 +197,31 @@ depends on portrait, or on a list being tall enough to build.
   `keys/keystore.jks` is already tracked; rotation via Play App Signing is
   the accepted fix — don't make it worse.
 
+## Look and feel (Momentum's palette, deliberately)
+
+`lib/theme.dart` holds the whole palette, sampled from momentumenergy.com.au:
+deep indigo `#000045` with the mint `#2CF2AE` accent and a cyan `#4FD8F0` for
+the icon gradient. The app is NOT affiliated with Momentum Energy, but it reads
+an export their customers download from MyAccount, so it speaks the visual
+language those customers already associate with their account. The line not to
+cross is passing for an official app: their logo, wordmark (Poppins) and
+artwork stay theirs.
+
+Amber's palette (`../amber/lib/theme.dart`) is a close cousin — both retailers
+brand navy-plus-mint. The two apps are told apart by Momentum's deeper indigo
+ground and its cyan-into-mint gradient against Amber's slate navy and flat
+mint, and by the icon silhouettes (ascending here, a price peak there).
+
+Screens must not hardcode hex colours; add a named `MomentumPalette` entry
+instead. Accent roles (chips, `FilledButton`, the `NavigationBar` indicator)
+come from `darkTheme` in `main.dart`.
+
+**Encoding:** these files contain em-dashes and middle dots. Do NOT rewrite
+them with PowerShell's `Get-Content`/`Set-Content` or `[IO.File]` helpers — the
+default-encoding round-trip turns `—` into mojibake, and .NET resolves relative
+paths against the process directory, not `$PWD` (that is how an unrelated
+repo's pubspec.yaml once landed here). Use an editor or Python with an explicit
+`encoding='utf-8'`.
 ## Store assets and the app icon
 
 `store/` holds everything the Play Store / App Store listings are built from,

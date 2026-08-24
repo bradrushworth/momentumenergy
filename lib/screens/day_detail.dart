@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../bar_chart.dart';
 import '../state/day_math.dart';
 import '../tariffs.dart';
+import 'package:momentum_energy/theme.dart';
 
 /// Full-screen detail for a single history entry (day or week): a full-height
 /// cost chart with LIVE tooltips above a row of TOTAL / USED / SUPPLY stat
@@ -36,7 +37,7 @@ class DayDetail extends StatelessWidget {
     return Expanded(
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF23232F),
+          color: MomentumPalette.skeleton,
           borderRadius: BorderRadius.circular(6),
         ),
         padding: const EdgeInsets.all(8),
@@ -47,7 +48,7 @@ class DayDetail extends StatelessWidget {
             Text(
               label,
               style: const TextStyle(
-                color: Color(0xFF9595A4),
+                color: MomentumPalette.muted,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.0,
@@ -74,9 +75,9 @@ class DayDetail extends StatelessWidget {
     final supply = tariffs.daily * duration.inDays;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF20202A),
+      backgroundColor: MomentumPalette.indigo,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A26),
+        backgroundColor: MomentumPalette.surface,
         title: Text(title),
       ),
       body: Column(

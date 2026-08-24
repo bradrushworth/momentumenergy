@@ -9,6 +9,7 @@ import '../widgets/chart_card.dart';
 import '../widgets/legend_bar.dart';
 import '../widgets/status_views.dart';
 import 'day_detail.dart';
+import 'package:momentum_energy/theme.dart';
 
 enum _Metric { cost, usage }
 
@@ -188,7 +189,7 @@ class _HistoryTabState extends State<HistoryTab> {
 
   Widget _landscapeHeader() {
     const style = TextStyle(
-      color: Color(0xFF9595A4),
+      color: MomentumPalette.muted,
       fontWeight: FontWeight.bold,
       fontSize: 12,
       letterSpacing: 1.2,

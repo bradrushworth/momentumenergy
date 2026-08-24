@@ -6,11 +6,12 @@ import '../state/csv_state.dart';
 import '../tariffs.dart';
 import '../utils.dart';
 import '../version.dart';
+import 'package:momentum_energy/theme.dart';
 
-const _kBg = Color(0xFF20202A);
-const _kAppBarBg = Color(0xFF1A1A26);
-const _kFieldBg = Color(0xFF1A1A26);
-const _kMuted = Color(0xFF9595A4);
+const _kBg = MomentumPalette.indigo;
+const _kAppBarBg = MomentumPalette.surface;
+const _kFieldBg = MomentumPalette.surface;
+const _kMuted = MomentumPalette.muted;
 
 const _kSectionLabelStyle = TextStyle(
   color: _kMuted,
