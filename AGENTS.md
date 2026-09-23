@@ -325,6 +325,16 @@ second time makes the launcher icon look tiny.
   `importError` rather than throwing a `RangeError` out of `dateParse` at
   build time. `restore` / `loadSample` / `importFile` are guarded too — no
   path leaves the app stuck in `loading`.
+- `android/build.gradle` must keep TWO `subprojects` blocks: buildDir
+  redirection first, `evaluationDependsOn(':app')` second (Flutter's
+  template). Merged into one, any plugin whose name sorts before "app"
+  evaluates `:app` with its default buildDir, the default R8 rules path goes
+  stale, and `bundleRelease` fails with "Missing class
+  androidx.window.extensions…" — which is how 1.6.0+28 first failed on CI
+  (file_picker 13 added `android_file_picker`). `test/android_build_config_test.dart`
+  guards it. `flutter test` passing says nothing about this; before a release
+  that changes Android plugins, run `flutter build appbundle --release`
+  locally (it needs `android/key.properties` from the main checkout).
 - Flutter's tooling deletes the `/lib/generated_plugin_registrant.dart` line
   from `.gitignore` on any web build; that change is committed, so a build
   leaving `.gitignore` modified means something else touched it. The file
