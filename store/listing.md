@@ -31,11 +31,17 @@ WHAT YOU GET
   controlled load — so the dollar figures match your actual plan
 
 HOW TO GET YOUR FILE
-1. Sign in to the Momentum Energy MyAccount portal
-2. Open your usage table and choose "Export table" for the period you want
-3. Open the file in the app
+The app walks you through it the first time you open it:
+1. Open My Usage in the Momentum Energy MyAccount portal (the app links you
+   straight there)
+2. Choose a time period and tap "Export table" — a few weeks works best
+3. Tap Import my CSV and pick the downloaded file
 
-The file is read on your device and never leaves it.
+Not a customer yet? Try it with the sample data first — it is clearly marked
+as sample so you never mistake it for yours.
+
+The file is read on your device and never leaves it. The app keeps it there so
+your charts are waiting next time, until you remove it in Settings.
 
 GOOD TO KNOW
 This app is only useful to you if you are a Momentum Energy customer in
@@ -52,11 +58,11 @@ their trademark.
 
 ## What's new (500 char limit)
 
-A rebuilt interface with Data, Days and Weeks tabs — scroll your history and tap
-any day for a half-hourly breakdown. Switch any view between usage and cost,
-rotate to landscape for side-by-side charts, and set your own rates in Settings
-so the dollar figures match your plan. Plus a new app icon, clearer chart labels
-and a full-word legend.
+A step-by-step guide on first launch shows exactly where to download your usage
+file in Momentum MyAccount and how to import it. Sample data is now optional
+and always labelled as sample. Your imported file is remembered between
+launches, and Settings can remove it. Chart bars now fill their space properly
+on every screen size, and About shows the right version.
 
 ## Assets
 
