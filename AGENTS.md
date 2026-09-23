@@ -164,6 +164,12 @@ defaults and test anchors.
 - Bars are fixed **half-hour buckets**: 48/day, `graphPos = hour * 2 +
   minute ~/ 30`, six 5-minute reads summed per bar. Do NOT change to
   per-interval bars (tried, reverted).
+- Bar **width** is sized to the card, not fixed: `BarChartState` measures
+  itself with a `LayoutBuilder` and `barWidthFor` gives every rod ~70% of
+  its slot (clamped 1.5–24px). A fixed 6px rod looked like a barcode in a
+  full-width landscape card and ran together on a phone. (`groupsSpace` does
+  nothing here — fl_chart only reads it for start/centre/end alignment, and
+  the chart uses the default `spaceEvenly`.)
 - Time-of-use windows (weekdays): off-peak < 07:00, shoulder 07–17, peak
   17–20, shoulder 20–22, off-peak ≥ 22:00. **Weekends are billed off-peak all
   day** (`_getCost`).

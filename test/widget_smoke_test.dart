@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:momentum_energy/bar_chart.dart';
 import 'package:momentum_energy/widgets/chart_card.dart';
@@ -17,7 +18,54 @@ Widget _host(Widget child) {
   );
 }
 
+/// The rod width the chart actually drew in a card [width] wide.
+Future<double> _drawnRodWidth(WidgetTester tester, double width) async {
+  await tester.pumpWidget(MaterialApp(
+    home: Scaffold(
+      body: Center(
+        child: SizedBox(
+          width: width,
+          height: 300,
+          child: BarChartWidget1(rowsFor2Days, 1, 'Mon 7 Jul', const Duration(days: 1)),
+        ),
+      ),
+    ),
+  ));
+  await tester.pumpAndSettle();
+  final chart = tester.widget<BarChart>(find.byType(BarChart));
+  return chart.data.barGroups.first.barRods.first.width;
+}
+
 void main() {
+  group('bar widths track the card', () {
+    test('about 70% of each slot, clamped', () {
+      // 48 half-hour bars; 40px of the width is the y-axis labels.
+      expect(barWidthFor(40 + 48 * 10, 48), closeTo(7, 1e-9)); // Amber's look
+      expect(barWidthFor(40 + 48 * 20, 48), closeTo(14, 1e-9));
+      expect(barWidthFor(40 + 48 * 4, 48), closeTo(2.8, 1e-9));
+      expect(barWidthFor(100, 48), 1.5);
+      expect(barWidthFor(10000, 48), 24);
+      expect(barWidthFor(double.infinity, 48), 6);
+      expect(barWidthFor(500, 0), 6);
+    });
+
+    testWidgets('a wide card draws wider bars than a phone card, never touching',
+        (tester) async {
+      tester.view.physicalSize = const Size(1400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final phone = await _drawnRodWidth(tester, 340);
+      final landscape = await _drawnRodWidth(tester, 1100);
+
+      expect(landscape, greaterThan(phone * 3));
+      // Each rod stays inside its slot (the chart is 8px narrower than the
+      // card, and the axis takes 40px), so neighbours never run together.
+      expect(phone, lessThan((340 - 8 - 40) / 48));
+      expect(landscape, lessThan((1100 - 8 - 40) / 48));
+    });
+  });
+
   group('BarChartWidget1 smoke', () {
     testWidgets('renders parsed rows without the old legend texts', (tester) async {
       await tester.pumpWidget(_host(
