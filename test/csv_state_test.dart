@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:momentum_energy/state/csv_state.dart';
 
@@ -26,6 +28,25 @@ void main() {
     expect(s.numMeters, 1);
     expect(s.dayCount, 2);
     expect(s.lastDate!.day, 8);
+  });
+
+  test('the bundled export parses whole: every row, both meters, its dates', () async {
+    // Guards the csv decoder config (csv 8 replaced CsvToListConverter): the
+    // real export has a space after each comma and CRLF line endings, and
+    // every kWh field must still arrive as a num or the shape check drops it.
+    final text = await File('assets/Your_Usage_List.csv').readAsString();
+    final dataLines =
+        text.split(RegExp(r'\r?\n')).skip(1).where((l) => l.trim().isNotEmpty).length;
+
+    final s = CsvState();
+    s.setCsvForTest('Your_Usage_List.csv', text);
+
+    expect(s.status, CsvStatus.ready);
+    expect(s.rows.length, dataLines);
+    expect(s.rows.every((r) => r[1] is num), isTrue);
+    expect(s.numMeters, 2);
+    expect(s.firstDate, DateTime(2022, 12, 13));
+    expect(s.lastDate, DateTime(2023, 1, 2));
   });
 
   test('malformed csv becomes an error status, not a crash', () {

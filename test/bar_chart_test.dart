@@ -1,9 +1,8 @@
 import 'dart:io';
 
-import 'package:csv/csv.dart';
-import 'package:csv/csv_settings_autodetection.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:momentum_energy/bar_chart.dart';
+import 'package:momentum_energy/state/csv_state.dart' show usageCsv;
 import 'package:momentum_energy/tariffs.dart';
 
 void main() {
@@ -12,9 +11,7 @@ void main() {
 
     test('1 Day', () async {
       final myData = await File('assets/Your_Usage_List_Sample.csv').readAsString();
-      List<List<dynamic>> data = const CsvToListConverter(
-              csvSettingsDetector: FirstOccurrenceSettingsDetector(eols: ['\r\n', '\n']))
-          .convert(myData, shouldParseNumbers: true);
+      List<List<dynamic>> data = usageCsv.decode(myData);
       List<dynamic> fieldNames = data.removeAt(0);
       expect(fieldNames.length, 3);
       expect(fieldNames[0].trim(), 'Date and Time');
@@ -55,9 +52,7 @@ void main() {
 
     test('1 Day Costs', () async {
       final myData = await File('assets/Your_Usage_List_Sample.csv').readAsString();
-      List<List<dynamic>> data = const CsvToListConverter(
-              csvSettingsDetector: FirstOccurrenceSettingsDetector(eols: ['\r\n', '\n']))
-          .convert(myData, shouldParseNumbers: true);
+      List<List<dynamic>> data = usageCsv.decode(myData);
       List<dynamic> fieldNames = data.removeAt(0);
       expect(fieldNames.length, 3);
       expect(fieldNames[0].trim(), 'Date and Time');
@@ -93,9 +88,7 @@ void main() {
 
     test('2 Days', () async {
       final myData = await File('assets/Your_Usage_List_Sample.csv').readAsString();
-      List<List<dynamic>> data = const CsvToListConverter(
-              csvSettingsDetector: FirstOccurrenceSettingsDetector(eols: ['\r\n', '\n']))
-          .convert(myData, shouldParseNumbers: true);
+      List<List<dynamic>> data = usageCsv.decode(myData);
       List<dynamic> fieldNames = data.removeAt(0);
       expect(fieldNames.length, 3);
       expect(fieldNames[0].trim(), 'Date and Time');
@@ -144,9 +137,7 @@ void main() {
 
     test('1 Day Costs 1 Day Prior', () async {
       final myData = await File('assets/Your_Usage_List_Sample.csv').readAsString();
-      List<List<dynamic>> data = const CsvToListConverter(
-              csvSettingsDetector: FirstOccurrenceSettingsDetector(eols: ['\r\n', '\n']))
-          .convert(myData, shouldParseNumbers: true);
+      List<List<dynamic>> data = usageCsv.decode(myData);
       List<dynamic> fieldNames = data.removeAt(0);
       expect(fieldNames.length, 3);
       expect(fieldNames[0].trim(), 'Date and Time');

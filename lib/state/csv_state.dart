@@ -1,13 +1,19 @@
 import 'dart:convert' show utf8;
 
 import 'package:csv/csv.dart';
-import 'package:csv/csv_settings_autodetection.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:momentum_energy/bar_chart.dart' show DataAggregator;
 
 enum CsvStatus { loading, ready, cancelled, error }
+
+/// The decoder for a Momentum usage export: comma-separated with numbers
+/// parsed, so the kWh column arrives as `num` (fields carry a leading space,
+/// which `int`/`double.tryParse` ignore). The delimiter is pinned rather than
+/// auto-detected so a stray error-message line cannot change it, and csv 8
+/// accepts both CRLF and LF line endings on its own.
+final Csv usageCsv = Csv(autoDetect: false, dynamicTyping: true);
 
 /// Parses the imported/bundled CSV export exactly once and holds the result
 /// for every screen to share, replacing the old parse-per-widget pattern.
@@ -76,20 +82,16 @@ class CsvState extends ChangeNotifier {
     }
   }
 
-  /// Picks and parses a file. `pickFiles` itself can throw (no platform
+  /// Picks and parses a file. `pickFile` itself can throw (no platform
   /// channel, a permission refusal, an unreadable file), so it is guarded the
   /// same way as [loadDefaultAsset].
   Future<void> importFile() async {
     try {
-      final FilePickerResult? result = await FilePicker.platform.pickFiles(
-        withData: true,
-        type: FileType.any,
-        allowMultiple: false,
-      );
-      if (result != null && result.files.first.bytes != null) {
+      final PlatformFile? file = await FilePicker.pickFile(type: FileType.any);
+      if (file != null) {
         // Momentum exports are UTF-8; fromCharCodes treated the bytes as UTF-16.
-        final data = utf8.decode(result.files.first.bytes!, allowMalformed: true);
-        _parse(result.files.first.name, data);
+        final data = utf8.decode(await file.readAsBytes(), allowMalformed: true);
+        _parse(file.name, data);
       } else {
         // User cancelled the picker.
         status = CsvStatus.cancelled;
@@ -122,9 +124,7 @@ class CsvState extends ChangeNotifier {
 
   void _parse(String name, String csv) {
     try {
-      final List<List<dynamic>> data = const CsvToListConverter(
-              csvSettingsDetector: FirstOccurrenceSettingsDetector(eols: ['\r\n', '\n']))
-          .convert(csv, shouldParseNumbers: true);
+      final List<List<dynamic>> data = usageCsv.decode(csv);
       if (data.isEmpty) {
         throw const FormatException('Empty export.');
       }
