@@ -2,9 +2,16 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:momentum_energy/state/csv_state.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'fake_picker.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
 
   const twoMeter = 'Date and Time, kWh, Quality\n'
       '13/12/22 00:05, 0.1, Actual\n13/12/22 00:05, 0.2, Actual\n'
@@ -110,33 +117,163 @@ void main() {
     expect(s.status, CsvStatus.ready);
   });
 
-  test('loadDefaultAsset failure ends in error, not eternal loading', () async {
-    final original = CsvState.defaultAssetKey;
-    addTearDown(() => CsvState.defaultAssetKey = original);
-    CsvState.defaultAssetKey = 'assets/does_not_exist.csv';
+  test('loadSample failure ends in error, not eternal loading', () async {
+    final original = CsvState.sampleAssetKey;
+    addTearDown(() => CsvState.sampleAssetKey = original);
+    CsvState.sampleAssetKey = 'assets/does_not_exist.csv';
 
     final s = CsvState();
     expect(s.status, CsvStatus.loading);
 
-    await s.loadDefaultAsset();
+    await s.loadSample();
 
     expect(s.status, CsvStatus.error);
     expect(s.errorMessage, isNotNull);
     expect(s.rows, isEmpty);
   });
 
-  test('loadDefaultAsset failure over a good file only sets importError', () async {
+  test('loadSample failure over a good file only sets importError', () async {
     final s = CsvState();
     s.setCsvForTest('good.csv', oneMeter);
 
-    final original = CsvState.defaultAssetKey;
-    addTearDown(() => CsvState.defaultAssetKey = original);
-    CsvState.defaultAssetKey = 'assets/does_not_exist.csv';
+    final original = CsvState.sampleAssetKey;
+    addTearDown(() => CsvState.sampleAssetKey = original);
+    CsvState.sampleAssetKey = 'assets/does_not_exist.csv';
 
-    await s.loadDefaultAsset();
+    await s.loadSample();
 
     expect(s.status, CsvStatus.ready);
     expect(s.rows, isNotEmpty);
     expect(s.importError, isNotNull);
+  });
+
+  group('launch, sample and saved imports', () {
+    test('a first launch with nothing saved settles on empty, not the sample', () async {
+      final s = CsvState();
+      await s.restore();
+
+      expect(s.status, CsvStatus.empty);
+      expect(s.rows, isEmpty);
+      expect(s.source, CsvSource.none);
+      expect(s.isSample, isFalse);
+    });
+
+    test('the sample loads only when asked for, and says it is the sample', () async {
+      final s = CsvState();
+      await s.loadSample();
+
+      expect(s.status, CsvStatus.ready);
+      expect(s.isSample, isTrue);
+      expect(s.hasUserData, isFalse);
+      expect(s.fileName, 'Sample export');
+      expect(s.numMeters, 2);
+    });
+
+    test('an import is saved and comes back on the next launch', () async {
+      final s = CsvState();
+      expect(await s.importCsv('Your_Usage_List_1.csv', oneMeter), isTrue);
+      expect(s.hasUserData, isTrue);
+      expect(s.savedOnDevice, isTrue);
+
+      final relaunched = CsvState();
+      await relaunched.restore();
+
+      expect(relaunched.status, CsvStatus.ready);
+      expect(relaunched.hasUserData, isTrue);
+      expect(relaunched.fileName, 'Your_Usage_List_1.csv');
+      expect(relaunched.dayCount, 2);
+    });
+
+    test("importing over the sample replaces it with the user's own data", () async {
+      final s = CsvState();
+      await s.loadSample();
+      await s.importCsv('mine.csv', oneMeter);
+
+      expect(s.isSample, isFalse);
+      expect(s.hasUserData, isTrue);
+      expect(s.fileName, 'mine.csv');
+    });
+
+    test('a failed import keeps the saved file as well as the one on screen', () async {
+      final s = CsvState();
+      await s.importCsv('good.csv', oneMeter);
+
+      expect(await s.importCsv('junk.csv', 'Sorry, an error occurred'), isFalse);
+      expect(s.importError, isNotNull);
+
+      final relaunched = CsvState();
+      await relaunched.restore();
+      expect(relaunched.fileName, 'good.csv');
+    });
+
+    test('a saved file that no longer parses is dropped, back to the guide', () async {
+      SharedPreferences.setMockInitialValues({
+        CsvState.savedCsvKey: 'Sorry, an error occurred',
+        CsvState.savedNameKey: 'broken.csv',
+      });
+
+      final s = CsvState();
+      await s.restore();
+
+      expect(s.status, CsvStatus.empty);
+      expect(s.errorMessage, isNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(CsvState.savedCsvKey), isNull);
+    });
+
+    test('removeUserData deletes the saved file and returns to empty', () async {
+      final s = CsvState();
+      await s.importCsv('mine.csv', oneMeter);
+
+      await s.removeUserData();
+
+      expect(s.status, CsvStatus.empty);
+      expect(s.rows, isEmpty);
+      expect(s.source, CsvSource.none);
+      expect(s.fileName, isNull);
+      final relaunched = CsvState();
+      await relaunched.restore();
+      expect(relaunched.status, CsvStatus.empty);
+    });
+
+    test('importFile reads the picked file, then saves it', () async {
+      usePicker(PickedFile('picked.csv', oneMeter));
+      final s = CsvState();
+
+      expect(await s.importFile(), isTrue);
+      expect(s.fileName, 'picked.csv');
+      expect(s.hasUserData, isTrue);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(CsvState.savedNameKey), 'picked.csv');
+    });
+
+    test("cancelling the picker leaves the user's data on screen", () async {
+      // It used to flip to "cancelled" and reload the sample two seconds
+      // later — over the top of the user's own import.
+      final s = CsvState();
+      await s.importCsv('mine.csv', oneMeter);
+      final rows = s.rows;
+      usePicker(null);
+
+      expect(await s.importFile(), isFalse);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(s.rows, same(rows));
+      expect(s.fileName, 'mine.csv');
+      expect(s.hasUserData, isTrue);
+      expect(s.status, CsvStatus.ready);
+      expect(s.importError, isNull);
+    });
+
+    test('cancelling the picker from the guide stays on the guide', () async {
+      final s = CsvState();
+      await s.restore();
+      usePicker(null);
+
+      expect(await s.importFile(), isFalse);
+
+      expect(s.status, CsvStatus.empty);
+      expect(s.errorMessage, isNull);
+    });
   });
 }

@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/csv_state.dart';
+import '../state/formats.dart';
 import '../tariffs.dart';
 import '../utils.dart';
 import '../version.dart';
+import 'onboarding.dart' show openDataGuide;
 import 'package:momentum_energy/theme.dart';
 
 const _kBg = MomentumPalette.indigo;
@@ -20,7 +22,8 @@ const _kSectionLabelStyle = TextStyle(
   letterSpacing: 1.2,
 );
 
-/// Settings: tariff rate entry + About links.
+/// Settings: the loaded file (import, how-to guide, remove), tariff rate
+/// entry, and About links.
 ///
 /// The five rate fields mirror `Tariffs` (lib/tariffs.dart): `daily` is
 /// $/day, the rest are $/kWh. Save parses all five as doubles first — any
@@ -118,8 +121,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  /// Deleting the saved import sends the user back to the welcome guide, so
+  /// it asks first; Settings then closes to show that guide.
+  Future<void> _confirmRemove() async {
+    final bool? remove = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove your usage data?'),
+        content: const Text(
+            'This deletes the imported file from this device. You can import '
+            'it again at any time.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (remove != true || !mounted) return;
+    await context.read<CsvState>().removeUserData();
+    if (mounted) Navigator.of(context).maybePop();
+  }
+
+  List<Widget> _dataSection(CsvState state) {
+    final first = state.firstDate;
+    final last = state.lastDate;
+    final String title = state.hasUserData
+        ? (state.fileName ?? 'Your usage file')
+        : state.isSample
+            ? 'Sample data (not yours)'
+            : 'No usage file loaded';
+    final String? range = first != null && last != null && state.rows.isNotEmpty
+        ? '${dayYearFormat.format(first)} – ${dayYearFormat.format(last)}'
+        : null;
+    final String? saved = !state.hasUserData
+        ? null
+        : state.savedOnDevice
+            ? 'Saved on this device'
+            : 'Not saved on this device — import it again next time';
+
+    return [
+      const Text('YOUR DATA', style: _kSectionLabelStyle),
+      ListTile(
+        title: Text(title, style: const TextStyle(color: Colors.white)),
+        subtitle: range == null && saved == null
+            ? null
+            : Text([?range, ?saved].join('\n'),
+                style: const TextStyle(color: _kMuted)),
+      ),
+      ListTile(
+        leading: const Icon(Icons.upload_file, color: _kMuted),
+        title: Text(state.hasUserData ? 'Import a newer CSV' : 'Import my CSV',
+            style: const TextStyle(color: Colors.white)),
+        onTap: state.importFile,
+      ),
+      ListTile(
+        leading: const Icon(Icons.help_outline, color: _kMuted),
+        title: const Text('How to get your CSV', style: TextStyle(color: Colors.white)),
+        onTap: () => openDataGuide(context),
+      ),
+      if (state.hasUserData)
+        ListTile(
+          leading: const Icon(Icons.delete_outline, color: _kMuted),
+          title: const Text('Remove my data from this device',
+              style: TextStyle(color: Colors.white)),
+          onTap: _confirmRemove,
+        ),
+      const SizedBox(height: 24),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
+    final state = context.watch<CsvState>();
     return Scaffold(
       backgroundColor: _kBg,
       appBar: AppBar(
@@ -133,6 +212,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            ..._dataSection(state),
             const Text('TARIFF RATES', style: _kSectionLabelStyle),
             const SizedBox(height: 8),
             _rateField(

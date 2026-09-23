@@ -68,6 +68,18 @@ final ThemeData darkTheme = ThemeData.dark().copyWith(
   textButtonTheme: TextButtonThemeData(
     style: TextButton.styleFrom(foregroundColor: MomentumPalette.mint),
   ),
+  // The textTheme above replaces dark()'s wholesale, so a dialog's title
+  // inherits no colour and draws near-black on the indigo surface.
+  dialogTheme: const DialogThemeData(
+    backgroundColor: MomentumPalette.surface,
+    surfaceTintColor: Colors.transparent,
+    titleTextStyle: TextStyle(
+      color: Colors.white,
+      fontSize: 20,
+      fontWeight: FontWeight.bold,
+    ),
+    contentTextStyle: TextStyle(color: MomentumPalette.mutedBright, fontSize: 14),
+  ),
 );
 
 /// Hydrates the mutable `tariffs` singleton from SharedPreferences before the
@@ -87,7 +99,7 @@ void main() {
     DevicePreview(
       enabled: !kReleaseMode && kIsWeb,
       builder: (context) => ChangeNotifierProvider(
-        create: (_) => CsvState()..loadDefaultAsset(),
+        create: (_) => CsvState()..restore(),
         child: const MyApp(),
       ), // Wrap your app
       tools: !kReleaseMode && kIsWeb

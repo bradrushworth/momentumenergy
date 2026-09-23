@@ -13,9 +13,11 @@ import 'package:momentum_energy/theme.dart';
 /// and Settings actions) over a three-tab body (Data / Days / Weeks) driven by
 /// a [NavigationBar].
 ///
-/// When the CSV failed to parse and no rows survive, the body is [Onboarding]
-/// instead of the tabs — Momentum ships a bundled sample, so that only happens
-/// after a genuinely unreadable import (or an unreadable bundle).
+/// With nothing loaded — a first launch, "Remove my data", or a first import
+/// that failed to parse — the body is [Onboarding], the how-to-get-your-CSV
+/// guide, instead of the tabs. The bundled sample only loads when the user
+/// asks for it there, and while it is on screen a mint strip above every tab
+/// says so and leads back to the guide.
 ///
 /// When an import fails but a good file is still loaded
 /// ([CsvState.importError]), the tabs keep drawing that file and the failure
@@ -40,17 +42,19 @@ class _HomeShellState extends State<HomeShell> {
   /// (e.g. retrying the same broken file).
   String? _dismissedError;
 
-  /// `Mon 7 Jul – Tue 8 Jul` for the file currently on screen; empty until a
-  /// parse has actually produced dates (the shell renders during `loading`
-  /// too). Keyed on the rows, so a failed import keeps describing the file
-  /// the tabs are still drawing rather than blanking out.
+  /// `Mon 7 Jul – Tue 8 Jul` for the file currently on screen (prefixed
+  /// `Sample ·` for the bundled sample); empty until a parse has actually
+  /// produced dates (the shell renders during `loading` too). Keyed on the
+  /// rows, so a failed import keeps describing the file the tabs are still
+  /// drawing rather than blanking out.
   String _contextLine(CsvState state) {
     final first = state.firstDate;
     final last = state.lastDate;
     if (state.rows.isEmpty || first == null || last == null) {
       return '';
     }
-    return '${dayFormat.format(first)} – ${dayFormat.format(last)}';
+    final range = '${dayFormat.format(first)} – ${dayFormat.format(last)}';
+    return state.isSample ? 'Sample · $range' : range;
   }
 
   Widget _title(CsvState state) {
@@ -98,15 +102,58 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  /// Shown above every tab while the bundled sample is on screen, so nobody
+  /// mistakes someone else's 2022 usage for their own. Tapping anywhere on it
+  /// opens the guide.
+  Widget _sampleStrip(BuildContext context) {
+    return Material(
+      color: MomentumPalette.mint,
+      child: InkWell(
+        onTap: () => openDataGuide(context),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline, color: _background, size: 18),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  "You're looking at sample data, not yours",
+                  style: TextStyle(
+                    color: _background,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(foregroundColor: _background),
+                onPressed: () => openDataGuide(context),
+                child: const Text(
+                  'Use my data',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                    decorationColor: _background,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<CsvState>();
 
-    // A parse error that left nothing to show: the tab bar would be inert
-    // over three identical error bodies, so walk the user through importing
-    // a good export instead.
-    final bool onboarding =
-        state.rows.isEmpty && state.status == CsvStatus.error;
+    // Nothing to chart yet. While a load is in flight that is a spinner;
+    // otherwise (first launch, removed data, or a first import that failed)
+    // the tab bar would be inert over three empty bodies, so the guide takes
+    // the whole body instead.
+    final bool noData = state.rows.isEmpty;
+    final bool onboarding = noData && state.status != CsvStatus.loading;
 
     // A bad import over a good file: the tabs stay mounted and keep drawing
     // the surviving file, with a dismissible report of the failure above.
@@ -123,7 +170,7 @@ class _HomeShellState extends State<HomeShell> {
         actions: [
           IconButton(
             icon: const Icon(Icons.upload_file, color: _muted),
-            tooltip: 'Import export',
+            tooltip: 'Import usage CSV',
             onPressed: () => context.read<CsvState>().importFile(),
           ),
           IconButton(
@@ -138,21 +185,24 @@ class _HomeShellState extends State<HomeShell> {
       body: Column(
         children: [
           if (showError) _errorBanner(error),
+          if (state.isSample && !noData) _sampleStrip(context),
           Expanded(
             child: onboarding
                 ? const Onboarding()
-                : IndexedStack(
-                    index: _tab,
-                    children: const [
-                      DataTab(),
-                      HistoryTab(weeks: false),
-                      HistoryTab(weeks: true),
-                    ],
-                  ),
+                : noData
+                    ? const Center(child: CircularProgressIndicator())
+                    : IndexedStack(
+                        index: _tab,
+                        children: const [
+                          DataTab(),
+                          HistoryTab(weeks: false),
+                          HistoryTab(weeks: true),
+                        ],
+                      ),
           ),
         ],
       ),
-      bottomNavigationBar: onboarding
+      bottomNavigationBar: noData
           ? null
           : NavigationBar(
               backgroundColor: _surface,
