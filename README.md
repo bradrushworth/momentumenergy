@@ -1,9 +1,11 @@
 [Visualise your Momentum Energy electricity consumption](https://momentumenergy.codemagic.app/)
-using this flutter dashboard. Just download your usage file (
-e.g.&nbsp;`Your_Usage_List_202201071739166144.csv`) with the longest time period that suits you,
-from the [MyAccount Portal](https://www.momentumenergy.com.au/myaccount/my-usage) and then upload it
-to the app with the _Upload File_ link. The file stays locally on your device/computer and is
-processed by your browser.
+using this flutter dashboard. Open *My Usage* in the
+[MyAccount Portal](https://www.momentumenergy.com.au/myaccount/my-usage), choose a time period and
+tap _Export table_ to download your usage file (e.g.&nbsp;`Your_Usage_List_202201071739166144.csv`),
+then import it with the app's _Import my CSV_ button. The app walks you through this on first
+launch, and you can look around with sample data first. The file is processed on your
+device/computer, and the app keeps it there so it is still loaded next time (Settings → _Remove my
+data from this device_ deletes it).
 
 If you are having problems downloading CSV files from Momentum Energy, where the file is empty other
 than a single error message, please try using a shorter time period. The export feature appears to
@@ -43,7 +45,8 @@ This is a standard Flutter project.
 - Static analysis: `flutter analyze`
 
 The chart aggregation lives in `lib/bar_chart.dart` (`DataAggregator`) and the
-screens are assembled in `lib/main.dart`.
+screens live in `lib/screens/` (`home_shell.dart` hosts the tabs; `onboarding.dart` is the
+get-your-data guide), with the parsed CSV held once in `lib/state/csv_state.dart`.
 
 ## Building and deploying
 
