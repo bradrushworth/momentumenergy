@@ -56,7 +56,7 @@ workflows:
       - name: Flutter test
         script: flutter test
         # Editor setting "Stop build if tests or analysis fail" is ON for
-        # this app (unlike amber): tests are blocking.
+        # this app (and for amber since 2026-09-24): tests are blocking.
         ignore_failure: false
       - name: Build AAB (release)
         script: flutter build appbundle --release
